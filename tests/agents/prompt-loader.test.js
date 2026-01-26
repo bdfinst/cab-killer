@@ -94,4 +94,62 @@ Return JSON matching ReviewResult schema.
     assert.ok(prompt.checklist.includes('Item 1'))
     assert.ok(prompt.outputFormat.includes('"type": "object"'))
   })
+
+  it('should handle prompt with missing sections gracefully', async () => {
+    const promptContent = `# Incomplete Agent
+
+<role>
+Only has a role section.
+</role>
+
+Some other content without proper tags.
+`
+    writeFileSync(join(testDir, 'incomplete.md'), promptContent)
+
+    const prompt = await loader.load('incomplete')
+
+    assert.strictEqual(prompt.role.trim(), 'Only has a role section.')
+    assert.strictEqual(prompt.objective, '')
+    assert.strictEqual(prompt.checklist, '')
+    assert.strictEqual(prompt.outputFormat, '')
+    assert.ok(prompt.raw.includes('# Incomplete Agent'))
+  })
+
+  it('should handle prompt with malformed sections gracefully', async () => {
+    const promptContent = `# Malformed Agent
+
+<role>Unclosed role tag
+
+<objective>
+Valid objective here.
+</objective>
+
+<checklist>
+Missing closing tag
+
+<output_format>
+</output_format>
+`
+    writeFileSync(join(testDir, 'malformed.md'), promptContent)
+
+    const prompt = await loader.load('malformed')
+
+    assert.strictEqual(prompt.role, '')
+    assert.strictEqual(prompt.objective.trim(), 'Valid objective here.')
+    assert.strictEqual(prompt.checklist, '')
+    assert.strictEqual(prompt.outputFormat, '')
+    assert.ok(prompt.raw.includes('# Malformed Agent'))
+  })
+
+  it('should handle empty prompt file gracefully', async () => {
+    writeFileSync(join(testDir, 'empty.md'), '')
+
+    const prompt = await loader.load('empty')
+
+    assert.strictEqual(prompt.role, '')
+    assert.strictEqual(prompt.objective, '')
+    assert.strictEqual(prompt.checklist, '')
+    assert.strictEqual(prompt.outputFormat, '')
+    assert.strictEqual(prompt.raw, '')
+  })
 })

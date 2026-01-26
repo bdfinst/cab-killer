@@ -2,6 +2,8 @@ export {
   discoverFiles,
   readFileContent,
   filterByExtension,
+  loadChangedFiles,
+  loadAllFiles,
 } from './file-utils.js'
 
 export {
@@ -15,3 +17,5 @@ export {
   getChangedFiles,
   getChangedFilesSinceRef,
 } from './git-utils.js'
+
+export { extractJsonFromResponse } from './json-extractor.js'

@@ -66,6 +66,12 @@ describe('file-utils', () => {
 
       assert.ok(!files.some((f) => f.includes('tests')))
     })
+
+    it('should return empty array for non-existent directory', async () => {
+      const files = await discoverFiles('/path/that/does/not/exist')
+
+      assert.deepStrictEqual(files, [])
+    })
   })
 
   describe('readFileContent', () => {
@@ -79,6 +85,26 @@ describe('file-utils', () => {
       const content = await readFileContent(join(testDir, 'nonexistent.js'))
 
       assert.strictEqual(content, null)
+    })
+
+    it('should read binary file as string with potential encoding issues', async () => {
+      const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) // PNG header
+      writeFileSync(join(testDir, 'image.png'), binaryData)
+
+      const content = await readFileContent(join(testDir, 'image.png'))
+
+      assert.ok(content !== null)
+      assert.strictEqual(typeof content, 'string')
+    })
+
+    it('should handle files with invalid UTF-8 sequences', async () => {
+      const invalidUtf8 = Buffer.from([0x80, 0x81, 0x82, 0xff, 0xfe])
+      writeFileSync(join(testDir, 'invalid.bin'), invalidUtf8)
+
+      const content = await readFileContent(join(testDir, 'invalid.bin'))
+
+      assert.ok(content !== null)
+      assert.strictEqual(typeof content, 'string')
     })
   })
 

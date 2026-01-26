@@ -31,18 +31,20 @@ class FailingAgent extends BaseReviewAgent {
   }
 }
 
-class SlowAgent extends BaseReviewAgent {
-  constructor(name, delay) {
+class TrackingAgent extends BaseReviewAgent {
+  constructor(name, executionLog) {
     super(name)
-    this.delay = delay
+    this.executionLog = executionLog
   }
 
   async review() {
-    await new Promise((resolve) => setTimeout(resolve, this.delay))
+    this.executionLog.push({ agent: this.name, event: 'start' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    this.executionLog.push({ agent: this.name, event: 'end' })
     return this.formatResult({
       status: 'pass',
       issues: [],
-      summary: 'Done after delay',
+      summary: 'Done',
     })
   }
 }
@@ -86,18 +88,24 @@ describe('Orchestrator', () => {
   })
 
   it('should run all agents in parallel', async () => {
-    registry.register(new SlowAgent('slow-1', 50))
-    registry.register(new SlowAgent('slow-2', 50))
-    registry.register(new SlowAgent('slow-3', 50))
+    const executionLog = []
+    registry.register(new TrackingAgent('track-1', executionLog))
+    registry.register(new TrackingAgent('track-2', executionLog))
+    registry.register(new TrackingAgent('track-3', executionLog))
     const orchestrator = new Orchestrator(registry)
 
-    const start = Date.now()
     const results = await orchestrator.runAllAgentsParallel([])
-    const duration = Date.now() - start
 
     assert.strictEqual(results.length, 3)
-    // Should complete in ~50ms, not ~150ms (parallel vs sequential)
-    assert.ok(duration < 120, `Expected <120ms but took ${duration}ms`)
+    // Verify parallel execution: all agents should start before any agent ends
+    // by checking the order of events in the log (not timing-dependent)
+    const firstEndIndex = executionLog.findIndex((e) => e.event === 'end')
+    const startsBeforeFirstEnd = executionLog.slice(0, firstEndIndex).filter((e) => e.event === 'start')
+    assert.strictEqual(
+      startsBeforeFirstEnd.length,
+      3,
+      'All agents should start before any agent completes (parallel execution)',
+    )
   })
 
   it('should aggregate results correctly', () => {
@@ -162,5 +170,80 @@ describe('Orchestrator', () => {
 
     assert.strictEqual(results.length, 1)
     assert.strictEqual(results[0].agentName, 'enabled-agent')
+  })
+
+  it('should report final state when issues persist through all iterations in runLoop', async () => {
+    registry.register(new FailingAgent('always-fails'))
+    const orchestrator = new Orchestrator(registry)
+
+    const result = await orchestrator.runLoop([], { maxIterations: 3 })
+
+    assert.strictEqual(result.iterations, 3)
+    assert.strictEqual(result.maxIterations, 3)
+    assert.strictEqual(result.overallStatus, 'fail')
+    assert.strictEqual(result.totalIssues, 1)
+    assert.strictEqual(result.failed, 1)
+  })
+
+  it('should set and invoke progress callback via setProgressCallback', async () => {
+    const progressMessages = []
+    const callback = (progress) => progressMessages.push(progress)
+
+    registry.register(new PassingAgent('progress-agent'))
+    const orchestrator = new Orchestrator(registry)
+    orchestrator.setProgressCallback(callback)
+
+    await orchestrator.runSingleAgent('progress-agent', [])
+
+    assert.strictEqual(progressMessages.length, 2)
+    assert.strictEqual(progressMessages[0].message, 'Running progress-agent...')
+    assert.strictEqual(progressMessages[0].agent, 'progress-agent')
+    assert.strictEqual(progressMessages[1].message, 'progress-agent complete')
+    assert.strictEqual(progressMessages[1].agent, 'progress-agent')
+    assert.strictEqual(progressMessages[1].status, 'pass')
+  })
+
+  it('should invoke progress callback with correct messages during runAllAgentsParallel', async () => {
+    const progressMessages = []
+    const callback = (progress) => progressMessages.push(progress)
+
+    registry.register(new PassingAgent('parallel-1'))
+    registry.register(new PassingAgent('parallel-2'))
+    const orchestrator = new Orchestrator(registry)
+    orchestrator.setProgressCallback(callback)
+
+    await orchestrator.runAllAgentsParallel([])
+
+    assert.strictEqual(progressMessages.length, 2)
+    assert.strictEqual(progressMessages[0].message, 'Running 2 agents in parallel...')
+    assert.strictEqual(progressMessages[1].message, 'All agents complete')
+  })
+
+  it('should invoke progress callback during runLoop iterations', async () => {
+    const progressMessages = []
+    const callback = (progress) => progressMessages.push(progress)
+
+    registry.register(new FailingAgent('loop-agent'))
+    const orchestrator = new Orchestrator(registry)
+    orchestrator.setProgressCallback(callback)
+
+    await orchestrator.runLoop([], { maxIterations: 2 })
+
+    // Should have messages for: iteration 1, running agent, agent complete, issues found,
+    // iteration 2, running agent, agent complete, issues found
+    const iterationMessages = progressMessages.filter((p) => p.message.includes('Loop iteration'))
+    assert.strictEqual(iterationMessages.length, 2)
+    assert.strictEqual(iterationMessages[0].message, 'Loop iteration 1/2')
+    assert.strictEqual(iterationMessages[1].message, 'Loop iteration 2/2')
+  })
+
+  it('should not throw when reportProgress is called without callback set', async () => {
+    registry.register(new PassingAgent('no-callback-agent'))
+    const orchestrator = new Orchestrator(registry)
+
+    // Should not throw even without callback
+    await assert.doesNotReject(async () => {
+      await orchestrator.runSingleAgent('no-callback-agent', [])
+    })
   })
 })

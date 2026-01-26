@@ -6,7 +6,13 @@ const SEVERITY_TO_PRIORITY = {
   suggestion: 'low',
 }
 
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
+const PRIORITY_SORT_ORDER = { high: 0, medium: 1, low: 2 }
+
+const PRIORITY_LABELS = {
+  high: '[HIGH]',
+  medium: '[MEDIUM]',
+  low: '[LOW]',
+}
 
 /**
  * Convert a single issue to a correction prompt
@@ -59,8 +65,49 @@ export function groupIssuesByFile(issues) {
  */
 export function prioritizePrompts(prompts) {
   return [...prompts].sort(
-    (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+    (a, b) => PRIORITY_SORT_ORDER[a.priority] - PRIORITY_SORT_ORDER[b.priority],
   )
+}
+
+/**
+ * Group prompts by their affected files
+ *
+ * @param {Array} prompts - Array of CorrectionPrompts
+ * @returns {Object} Map of file path to prompts affecting that file
+ */
+export function groupPromptsByFile(prompts) {
+  const grouped = {}
+  for (const prompt of prompts) {
+    for (const file of prompt.affectedFiles) {
+      if (!grouped[file]) {
+        grouped[file] = []
+      }
+      grouped[file].push(prompt)
+    }
+  }
+  return grouped
+}
+
+/**
+ * Format a single file's prompts as text
+ *
+ * @param {string} file - File path
+ * @param {Array} filePrompts - Array of prompts for this file
+ * @returns {string} Formatted text for this file
+ */
+export function formatFilePrompts(file, filePrompts) {
+  let output = `## ${file}\n\n`
+
+  for (const prompt of filePrompts) {
+    const priorityLabel = PRIORITY_LABELS[prompt.priority] || '[MEDIUM]'
+    output += `- ${priorityLabel} ${prompt.instruction}\n`
+    if (prompt.context) {
+      output += `  - Context: ${prompt.context}\n`
+    }
+  }
+
+  output += '\n'
+  return output
 }
 
 /**
@@ -98,35 +145,11 @@ export class PromptGenerator {
       return 'No issues found. All reviews passed.'
     }
 
-    const grouped = {}
-    for (const prompt of prompts) {
-      for (const file of prompt.affectedFiles) {
-        if (!grouped[file]) {
-          grouped[file] = []
-        }
-        grouped[file].push(prompt)
-      }
-    }
+    const grouped = groupPromptsByFile(prompts)
 
     let output = '# Code Review Corrections Required\n\n'
-
     for (const [file, filePrompts] of Object.entries(grouped)) {
-      output += `## ${file}\n\n`
-
-      for (const prompt of filePrompts) {
-        const priorityEmoji =
-          prompt.priority === 'high'
-            ? '[HIGH]'
-            : prompt.priority === 'medium'
-              ? '[MEDIUM]'
-              : '[LOW]'
-        output += `- ${priorityEmoji} ${prompt.instruction}\n`
-        if (prompt.context) {
-          output += `  - Context: ${prompt.context}\n`
-        }
-      }
-
-      output += '\n'
+      output += formatFilePrompts(file, filePrompts)
     }
 
     return output.trim()

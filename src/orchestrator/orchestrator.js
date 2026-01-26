@@ -161,6 +161,35 @@ export class Orchestrator {
   }
 
   /**
+   * Run a single iteration of the review loop
+   *
+   * @param {Array} files - Files to review
+   * @param {number} iteration - Current iteration number
+   * @param {number} maxIterations - Maximum iterations
+   * @param {boolean} parallel - Run agents in parallel
+   * @returns {Promise<Object>} Iteration result with results and shouldContinue flag
+   */
+  async runSingleIteration(files, iteration, maxIterations, parallel) {
+    this.reportProgress(`Loop iteration ${iteration}/${maxIterations}`)
+
+    const results = parallel
+      ? await this.runAllAgentsParallel(files)
+      : await this.runAllAgents(files)
+
+    if (this.isAllPassing(results)) {
+      this.reportProgress('All agents passing, loop complete')
+      return { results, shouldContinue: false }
+    }
+
+    this.reportProgress(`Issues found, continuing loop...`, {
+      iteration,
+      issues: results.reduce((sum, r) => sum + (r.issues?.length || 0), 0),
+    })
+
+    return { results, shouldContinue: true }
+  }
+
+  /**
    * Run in loop mode until all pass or max iterations reached
    *
    * @param {Array} files - Files to review
@@ -180,21 +209,17 @@ export class Orchestrator {
 
     while (iteration < maxIterations) {
       iteration++
-      this.reportProgress(`Loop iteration ${iteration}/${maxIterations}`)
+      const iterationResult = await this.runSingleIteration(
+        files,
+        iteration,
+        maxIterations,
+        parallel,
+      )
+      results = iterationResult.results
 
-      results = parallel
-        ? await this.runAllAgentsParallel(files)
-        : await this.runAllAgents(files)
-
-      if (this.isAllPassing(results)) {
-        this.reportProgress('All agents passing, loop complete')
+      if (!iterationResult.shouldContinue) {
         break
       }
-
-      this.reportProgress(`Issues found, continuing loop...`, {
-        iteration,
-        issues: results.reduce((sum, r) => sum + (r.issues?.length || 0), 0),
-      })
     }
 
     return {

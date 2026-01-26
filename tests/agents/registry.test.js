@@ -84,4 +84,16 @@ describe('createAgentRegistry', () => {
     assert.ok(names.includes('complexity-review'))
     assert.ok(names.includes('claude-setup-review'))
   })
+
+  it('should create agents that can perform reviews', async () => {
+    const registry = createAgentRegistry()
+    const agent = registry.get('complexity-review')
+
+    const result = await agent.review([])
+
+    assert.strictEqual(result.agentName, 'complexity-review')
+    assert.ok(['pass', 'warn', 'fail'].includes(result.status))
+    assert.ok(Array.isArray(result.issues))
+    assert.ok(typeof result.summary === 'string')
+  })
 })

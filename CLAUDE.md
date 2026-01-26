@@ -57,6 +57,8 @@ src/
 │   ├── review-result.js # Review output structure
 │   ├── review-issue.js  # Individual issue found
 │   └── correction-prompt.js
+├── fixer/               # Fix application logic
+│   └── fix-orchestrator.js
 ├── utils/               # Shared utilities
 │   ├── code-parser.js   # Code parsing helpers
 │   └── file-utils.js    # File system operations
@@ -118,6 +120,15 @@ node src/index.js --mode loop --path ./code-to-review
 
 # Generate correction prompts only (no loop)
 node src/index.js --mode single --output prompts.json --path ./code-to-review
+
+# Review only changed files (uncommitted changes)
+node src/index.js --changed --path .
+
+# Review files changed since a specific branch
+node src/index.js --since main --path .
+
+# Apply fixes from saved prompts
+node src/index.js apply-fixes ./prompts-output --verbose
 ```
 
 ## Configuration
@@ -171,6 +182,16 @@ The Claude Setup Review Agent examines the project's AI assistant configuration:
 - CLAUDE.md directory structure matches actual project
 - Referenced files and paths exist
 - Commands in documentation actually work
+
+## Coding Conventions
+
+- Use `const` over `let` when variables are not reassigned (`prefer-const`)
+- Never use `var` (`no-var`)
+- Use strict equality (`===` and `!==`) instead of loose equality (`eqeqeq`)
+- Always use curly braces for control statements (`if`, `else`, `for`, `while`, etc.)
+- Unused variables are errors, except those prefixed with `_`
+
+See `eslint.config.js` for the complete linting configuration.
 
 ## Development Guidelines
 

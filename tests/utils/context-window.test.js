@@ -48,13 +48,15 @@ describe('context-window', () => {
     })
 
     it('should handle single large file', () => {
-      const files = [{ path: 'large.js', content: 'x'.repeat(10000) }]
+      const largeContent = 'x'.repeat(10000)
+      const files = [{ path: 'large.js', content: largeContent }]
 
       const chunks = chunkFiles(files, 500)
 
       // Large file should still be in a chunk (even if it exceeds limit)
       assert.strictEqual(chunks.length, 1)
       assert.strictEqual(chunks[0].length, 1)
+      assert.strictEqual(chunks[0][0].content, largeContent)
     })
   })
 

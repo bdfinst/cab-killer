@@ -1,10 +1,11 @@
-import { describe, it, beforeEach, afterEach } from 'node:test'
+import { describe, it, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert'
 import { isGitRepo, getChangedFiles, getChangedFilesSinceRef } from '../../src/utils/git-utils.js'
 import { tmpdir } from 'node:os'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
+import * as childProcess from 'node:child_process'
 
 describe('git-utils', () => {
   describe('isGitRepo', () => {
@@ -80,6 +81,48 @@ describe('git-utils', () => {
       // Should only appear once despite being in both staged and unstaged
       assert.deepStrictEqual(result, [join(tempDir, 'initial.txt')])
     })
+
+    it('should throw error when called on non-git directory', () => {
+      const nonGitDir = mkdtempSync(join(tmpdir(), 'non-git-test-'))
+      try {
+        // Create an empty .git file to block traversal to parent repos
+        writeFileSync(join(nonGitDir, '.git'), '')
+        assert.throws(
+          () => getChangedFiles(nonGitDir),
+          /fatal:|not a git repository/i
+        )
+      } finally {
+        rmSync(nonGitDir, { recursive: true, force: true })
+      }
+    })
+
+    it('should throw error when git command fails due to invalid repo state', () => {
+      // Corrupt the git repo by removing the HEAD file
+      rmSync(join(tempDir, '.git', 'HEAD'))
+      assert.throws(
+        () => getChangedFiles(tempDir),
+        Error
+      )
+    })
+
+    it('should throw error when git command fails due to permission errors', () => {
+      const originalExecSync = childProcess.execSync
+      mock.method(childProcess, 'execSync', () => {
+        const error = new Error('fatal: could not read from remote repository')
+        error.status = 128
+        error.stderr = Buffer.from('Permission denied (publickey)')
+        throw error
+      })
+
+      try {
+        assert.throws(
+          () => getChangedFiles(tempDir),
+          /fatal:|Permission denied/
+        )
+      } finally {
+        childProcess.execSync = originalExecSync
+      }
+    })
   })
 
   describe('getChangedFilesSinceRef', () => {
@@ -119,6 +162,13 @@ describe('git-utils', () => {
       writeFileSync(join(tempDir, 'initial.txt'), 'modified')
       const result = getChangedFilesSinceRef(tempDir, 'HEAD')
       assert.deepStrictEqual(result, [join(tempDir, 'initial.txt')])
+    })
+
+    it('should throw error with invalid git ref', () => {
+      assert.throws(
+        () => getChangedFilesSinceRef(tempDir, 'non-existent-branch-xyz'),
+        /unknown revision|bad revision|not a valid object name/i
+      )
     })
   })
 })

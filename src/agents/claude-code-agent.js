@@ -1,5 +1,6 @@
 import { BaseReviewAgent } from './base-agent.js'
 import { spawn } from 'node:child_process'
+import { extractJsonFromResponse } from '../utils/json-extractor.js'
 
 /**
  * Review agent that uses Claude Code CLI instead of API
@@ -118,19 +119,7 @@ Please analyze the code above and return your review as JSON only, no other text
    * @returns {Object} ReviewResult
    */
   parseResponse(response) {
-    let jsonStr = response
-
-    // Check for markdown code block
-    const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (codeBlockMatch) {
-      jsonStr = codeBlockMatch[1].trim()
-    }
-
-    // Try to find JSON object in response
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0]
-    }
+    const jsonStr = extractJsonFromResponse(response)
 
     let parsed
     try {

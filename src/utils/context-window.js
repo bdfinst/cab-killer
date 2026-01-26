@@ -16,10 +16,10 @@ export function estimateTokens(text) {
  * Chunk files into groups that fit within token limit
  *
  * @param {Array<{path: string, content: string}>} files - Files to chunk
- * @param {number} maxTokens - Maximum tokens per chunk
+ * @param {number} tokenLimit - Maximum tokens per chunk
  * @returns {Array<Array<{path: string, content: string}>>} Chunked files
  */
-export function chunkFiles(files, maxTokens) {
+export function chunkFiles(files, tokenLimit) {
   const chunks = []
   let currentChunk = []
   let currentTokens = 0
@@ -28,13 +28,13 @@ export function chunkFiles(files, maxTokens) {
     const fileTokens = estimateTokens(file.content) + estimateTokens(file.path)
 
     // If single file exceeds limit, put it in its own chunk
-    if (fileTokens > maxTokens && currentChunk.length === 0) {
+    if (fileTokens > tokenLimit && currentChunk.length === 0) {
       chunks.push([file])
       continue
     }
 
     // If adding this file would exceed limit, start new chunk
-    if (currentTokens + fileTokens > maxTokens && currentChunk.length > 0) {
+    if (currentTokens + fileTokens > tokenLimit && currentChunk.length > 0) {
       chunks.push(currentChunk)
       currentChunk = []
       currentTokens = 0
@@ -56,18 +56,18 @@ export function chunkFiles(files, maxTokens) {
  * Truncate content to fit within token limit, preserving start and end
  *
  * @param {string} content - Content to truncate
- * @param {number} maxTokens - Maximum tokens
+ * @param {number} tokenLimit - Maximum tokens
  * @returns {string} Truncated content
  */
-export function truncateContent(content, maxTokens) {
+export function truncateContent(content, tokenLimit) {
   const currentTokens = estimateTokens(content)
 
-  if (currentTokens <= maxTokens) {
+  if (currentTokens <= tokenLimit) {
     return content
   }
 
   // Keep ~40% from start, ~40% from end, truncate middle
-  const maxChars = maxTokens * 4
+  const maxChars = tokenLimit * 4
   const keepChars = Math.floor(maxChars * 0.4)
   const truncateMsg = '\n\n... [truncated] ...\n\n'
 

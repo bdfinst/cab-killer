@@ -150,5 +150,13 @@ describe('PromptGenerator', () => {
       assert.ok(output.includes('src/utils.js'))
       assert.ok(output.includes('Variable name not descriptive'))
     })
+
+    it('should return no issues message when results array is empty', () => {
+      const generator = new PromptGenerator()
+
+      const output = generator.formatForCodingAgent([])
+
+      assert.strictEqual(output, 'No issues found. All reviews passed.')
+    })
   })
 })

@@ -1,192 +1,195 @@
 import { program } from 'commander'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { resolve, dirname, join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAgentRegistry } from './agents/registry.js'
 import { Orchestrator } from './orchestrator/orchestrator.js'
 import { PromptGenerator } from './orchestrator/prompt-generator.js'
+import { loadChangedFiles, loadAllFiles } from './utils/file-utils.js'
+import { loadConfig } from './utils/config-loader.js'
 import {
-  discoverFiles,
-  readFileContent,
-  filterByExtension,
-} from './utils/file-utils.js'
-import {
-  isGitRepo,
-  getChangedFiles,
-  getChangedFilesSinceRef,
-} from './utils/git-utils.js'
-import { createConfig } from './models/config.js'
+  formatConsoleOutput,
+  formatMarkdownReport,
+} from './formatters/output-formatter.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 /**
- * Load configuration from file
+ * Load and validate files for review
  */
-async function loadConfig(configPath) {
-  if (!configPath) {
-    return createConfig()
+async function loadAndValidateFiles(targetPath, options) {
+  const useChangedMode = options.changed || options.since
+  const scanMode = options.changed
+    ? 'changed files'
+    : options.since
+      ? `files changed since ${options.since}`
+      : 'all files'
+  if (options.verbose) {
+    console.log(`Loading ${scanMode} from ${targetPath}...`)
   }
-
-  try {
-    const content = await readFile(configPath, 'utf-8')
-    const userConfig = JSON.parse(content)
-    return createConfig(userConfig)
-  } catch (error) {
-    console.error(
-      `Warning: Could not load config from ${configPath}:`,
-      error.message,
-    )
-    return createConfig()
+  const files = useChangedMode
+    ? await loadChangedFiles(targetPath, { since: options.since })
+    : await loadAllFiles(targetPath)
+  if (options.verbose) {
+    console.log(`Found ${files.length} files`)
   }
-}
-
-/**
- * Load files from target path
- *
- * @param {string} targetPath - Path to scan
- * @param {Object} options
- * @param {string} [options.pattern] - Glob pattern for files
- * @param {string[]} [options.ignore] - Patterns to ignore
- * @param {boolean} [options.changedOnly] - Only include files changed since last commit
- * @param {string} [options.since] - Git ref to compare against (for changed files)
- */
-async function loadFiles(targetPath, options = {}) {
-  const absolutePath = resolve(targetPath)
-  let filePaths
-
-  if (options.changedOnly || options.since) {
-    // Git diff mode - only changed files
-    if (!isGitRepo(absolutePath)) {
-      throw new Error('--changed requires a git repository')
-    }
-
-    if (options.since) {
-      filePaths = getChangedFilesSinceRef(absolutePath, options.since)
-    } else {
-      filePaths = getChangedFiles(absolutePath)
-    }
-
-    // Filter to only code files
-    const codeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs']
-    filePaths = filterByExtension(filePaths, codeExtensions)
-  } else {
-    // Full scan mode
-    filePaths = await discoverFiles(absolutePath, {
-      pattern: options.pattern || '**/*.{js,ts,jsx,tsx,mjs,cjs}',
-      ignore: options.ignore || [],
-    })
-  }
-
-  const files = []
-  for (const filePath of filePaths) {
-    const content = await readFileContent(filePath)
-    if (content !== null) {
-      files.push({
-        path: filePath.replace(absolutePath + '/', ''),
-        content,
-      })
-    }
-  }
-
   return files
 }
 
 /**
- * Format results for console output
+ * Mode handlers for different execution strategies
  */
-function formatConsoleOutput(aggregated, verbose) {
-  let output = '\n'
-  output += '═'.repeat(60) + '\n'
-  output += '  CODE REVIEW RESULTS\n'
-  output += '═'.repeat(60) + '\n\n'
-
-  const statusEmoji =
-    aggregated.overallStatus === 'pass'
-      ? '✓'
-      : aggregated.overallStatus === 'warn'
-        ? '!'
-        : '✗'
-
-  output += `Status: ${statusEmoji} ${aggregated.overallStatus.toUpperCase()}\n`
-  output += `Agents: ${aggregated.passed} passed, ${aggregated.warned} warned, ${aggregated.failed} failed\n`
-  output += `Issues: ${aggregated.totalIssues} total\n\n`
-
-  if (aggregated.iterations) {
-    output += `Loop iterations: ${aggregated.iterations}/${aggregated.maxIterations}\n\n`
-  }
-
-  for (const result of aggregated.results) {
-    const emoji =
-      result.status === 'pass' ? '✓' : result.status === 'warn' ? '!' : '✗'
-    output += `${emoji} ${result.agentName}: ${result.summary}\n`
-
-    if (verbose && result.issues.length > 0) {
-      for (const issue of result.issues) {
-        output += `  - [${issue.severity}] ${issue.file}:${issue.line} - ${issue.message}\n`
-      }
-    }
-  }
-
-  output += '\n' + '═'.repeat(60) + '\n'
-  return output
+const modeHandlers = {
+  async single(orchestrator, files, options) {
+    const results = await orchestrator.runAllAgents(files)
+    return orchestrator.aggregateResults(results)
+  },
+  async loop(orchestrator, files, options) {
+    const maxIterations = parseInt(options.maxIterations, 10)
+    return await orchestrator.runLoop(files, {
+      maxIterations,
+      parallel: options.parallel,
+    })
+  },
+  async parallel(orchestrator, files, options) {
+    const results = await orchestrator.runAllAgentsParallel(files)
+    return orchestrator.aggregateResults(results)
+  },
 }
 
 /**
- * Format results as markdown report
+ * Execute review based on mode and options
  */
-function formatMarkdownReport(aggregated) {
-  let md = '# Code Review Report\n\n'
-
-  const statusEmoji =
-    aggregated.overallStatus === 'pass'
-      ? '✅'
-      : aggregated.overallStatus === 'warn'
-        ? '⚠️'
-        : '❌'
-
-  md += `## Summary\n\n`
-  md += `- **Status**: ${statusEmoji} ${aggregated.overallStatus.toUpperCase()}\n`
-  md += `- **Agents**: ${aggregated.passed} passed, ${aggregated.warned} warned, ${aggregated.failed} failed\n`
-  md += `- **Total Issues**: ${aggregated.totalIssues}\n\n`
-
-  if (aggregated.iterations) {
-    md += `- **Loop Iterations**: ${aggregated.iterations}/${aggregated.maxIterations}\n\n`
+async function executeReviewMode(orchestrator, files, options) {
+  // Single agent mode takes precedence
+  if (options.agent) {
+    const result = await orchestrator.runSingleAgent(options.agent, files)
+    return orchestrator.aggregateResults([result])
   }
 
-  md += `## Agent Results\n\n`
+  // Determine execution mode
+  const mode = options.parallel ? 'parallel' : (options.mode || 'single')
+  const handler = modeHandlers[mode] || modeHandlers.single
+  return handler(orchestrator, files, options)
+}
 
-  for (const result of aggregated.results) {
-    const emoji =
-      result.status === 'pass' ? '✅' : result.status === 'warn' ? '⚠️' : '❌'
-    md += `### ${emoji} ${result.agentName}\n\n`
-    md += `${result.summary}\n\n`
+/**
+ * Output formatters lookup
+ */
+const formatters = {
+  json: (aggregated) => JSON.stringify(aggregated, null, 2),
+  markdown: (aggregated) => formatMarkdownReport(aggregated),
+  console: (aggregated, verbose) => formatConsoleOutput(aggregated, verbose),
+}
 
-    if (result.issues.length > 0) {
-      md += `| Severity | File | Line | Message |\n`
-      md += `|----------|------|------|--------|\n`
-      for (const issue of result.issues) {
-        md += `| ${issue.severity} | ${issue.file} | ${issue.line} | ${issue.message} |\n`
-      }
-      md += '\n'
+/**
+ * Format and output results
+ */
+async function formatAndOutputResults(aggregated, options) {
+  const formatType = options.json ? 'json' : options.markdown ? 'markdown' : 'console'
+  const output = formatters[formatType](aggregated, options.verbose)
+
+  if (options.output) {
+    await writeFile(options.output, output, 'utf-8')
+    console.log(`Results written to ${options.output}`)
+  } else {
+    console.log(output)
+  }
+}
+
+/**
+ * Generate and save correction prompts
+ */
+async function generateCorrectionPrompts(aggregated, options) {
+  if (aggregated.totalIssues === 0 || options.fix) {
+    return
+  }
+
+  const generator = new PromptGenerator()
+  const prompts = generator.generate(aggregated.results)
+
+  if (options.promptsOutput) {
+    await mkdir(options.promptsOutput, { recursive: true })
+
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i]
+      const filename = `${String(i + 1).padStart(3, '0')}-${prompt.category}.json`
+      const filepath = join(options.promptsOutput, filename)
+      await writeFile(filepath, JSON.stringify(prompt, null, 2), 'utf-8')
     }
+
+    console.log(
+      `${prompts.length} correction prompts written to ${options.promptsOutput}/`,
+    )
   }
 
-  return md
+  if (options.verbose) {
+    const correctionText = generator.formatForCodingAgent(aggregated.results)
+    console.log('\n--- Correction Prompts ---\n')
+    console.log(correctionText)
+  }
+}
+
+/**
+ * Handle the main review command
+ */
+async function handleReviewCommand(targetPath, options) {
+  const config = await loadConfig(options.config)
+  const promptsDir = join(__dirname, '..', 'prompts')
+  const registry = createAgentRegistry({ promptsDir })
+  const orchestrator = new Orchestrator(registry, config)
+
+  if (options.verbose) {
+    orchestrator.setProgressCallback(({ message }) => {
+      console.log(`[progress] ${message}`)
+    })
+  }
+
+  const files = await loadAndValidateFiles(targetPath, options)
+
+  if (files.length === 0) {
+    console.log('No files found to review.')
+    process.exit(0)
+  }
+
+  const aggregated = await executeReviewMode(orchestrator, files, options)
+  await formatAndOutputResults(aggregated, options)
+  await generateCorrectionPrompts(aggregated, options)
+
+  process.exit(aggregated.overallStatus === 'fail' ? 1 : 0)
+}
+
+/**
+ * Handle the apply-fixes subcommand
+ */
+async function handleApplyFixesCommand(promptsDir, options) {
+  const { FixOrchestrator } = await import('./fixer/fix-orchestrator.js')
+
+  const orchestrator = new FixOrchestrator({
+    dryRun: options.dry || false,
+    verbose: options.verbose || false,
+  })
+
+  const result = await orchestrator.applyFixes(promptsDir)
+  const report = orchestrator.generateReport(result)
+  console.log(report)
+
+  process.exit(result.failed > 0 ? 1 : 0)
 }
 
 /**
  * Main CLI entry point
  */
 export async function main() {
-  const pkg = JSON.parse(
+  const packageJson = JSON.parse(
     await readFile(join(__dirname, '..', 'package.json'), 'utf-8'),
   )
 
   program
     .name('cab-killer')
     .description('Multi-agent code review system')
-    .version(pkg.version)
+    .version(packageJson.version)
     .argument('[path]', 'Path to code directory to review', '.')
     .option('-a, --agent <name>', 'Run a specific agent only')
     .option('-m, --mode <mode>', 'Execution mode: single, all, loop', 'all')
@@ -212,119 +215,7 @@ export async function main() {
     )
     .action(async (targetPath, options) => {
       try {
-        // Load configuration
-        const config = await loadConfig(options.config)
-
-        // Create agent registry (uses Claude Code CLI)
-        const promptsDir = join(__dirname, '..', 'prompts')
-        const registry = createAgentRegistry({ promptsDir })
-
-        // Create orchestrator
-        const orchestrator = new Orchestrator(registry, config)
-
-        // Set up progress reporting
-        if (options.verbose) {
-          orchestrator.setProgressCallback(({ message }) => {
-            console.log(`[progress] ${message}`)
-          })
-        }
-
-        // Load files
-        const scanMode = options.changed
-          ? 'changed files'
-          : options.since
-            ? `files changed since ${options.since}`
-            : 'all files'
-        if (options.verbose) {
-          console.log(`Loading ${scanMode} from ${targetPath}...`)
-        }
-        const files = await loadFiles(targetPath, {
-          changedOnly: options.changed,
-          since: options.since,
-        })
-        if (options.verbose) {
-          console.log(`Found ${files.length} files`)
-        }
-
-        if (files.length === 0) {
-          console.log('No files found to review.')
-          process.exit(0)
-        }
-
-        let aggregated
-
-        // Execute based on mode
-        if (options.agent) {
-          // Single agent mode
-          const result = await orchestrator.runSingleAgent(options.agent, files)
-          aggregated = orchestrator.aggregateResults([result])
-        } else if (options.mode === 'loop') {
-          // Loop mode - review until no issues or max iterations
-          const maxIterations = parseInt(options.maxIterations, 10)
-          aggregated = await orchestrator.runLoop(files, {
-            maxIterations,
-            parallel: options.parallel,
-          })
-        } else if (options.parallel) {
-          // Parallel mode
-          const results = await orchestrator.runAllAgentsParallel(files)
-          aggregated = orchestrator.aggregateResults(results)
-        } else {
-          // Sequential mode (default)
-          const results = await orchestrator.runAllAgents(files)
-          aggregated = orchestrator.aggregateResults(results)
-        }
-
-        // Format output
-        let output
-        if (options.json) {
-          output = JSON.stringify(aggregated, null, 2)
-        } else if (options.markdown) {
-          output = formatMarkdownReport(aggregated)
-        } else {
-          output = formatConsoleOutput(aggregated, options.verbose)
-        }
-
-        // Write output
-        if (options.output) {
-          await writeFile(options.output, output, 'utf-8')
-          console.log(`Results written to ${options.output}`)
-        } else {
-          console.log(output)
-        }
-
-        // Generate correction prompts if there are issues
-        if (aggregated.totalIssues > 0 && !options.fix) {
-          const generator = new PromptGenerator()
-          const prompts = generator.generate(aggregated.results)
-
-          if (options.promptsOutput) {
-            // Save each prompt as a separate file for independent agents
-            await mkdir(options.promptsOutput, { recursive: true })
-
-            for (let i = 0; i < prompts.length; i++) {
-              const prompt = prompts[i]
-              const filename = `${String(i + 1).padStart(3, '0')}-${prompt.category}.json`
-              const filepath = join(options.promptsOutput, filename)
-              await writeFile(filepath, JSON.stringify(prompt, null, 2), 'utf-8')
-            }
-
-            console.log(
-              `${prompts.length} correction prompts written to ${options.promptsOutput}/`,
-            )
-          }
-
-          if (options.verbose) {
-            const correctionText = generator.formatForCodingAgent(
-              aggregated.results,
-            )
-            console.log('\n--- Correction Prompts ---\n')
-            console.log(correctionText)
-          }
-        }
-
-        // Exit with appropriate code
-        process.exit(aggregated.overallStatus === 'fail' ? 1 : 0)
+        await handleReviewCommand(targetPath, options)
       } catch (error) {
         console.error('Error:', error.message)
         if (options.verbose) {
@@ -342,24 +233,8 @@ export async function main() {
     .option('-v, --verbose', 'Show detailed output')
     .option('-d, --dry', 'Show prompts without applying fixes')
     .action(async (promptsDir, options) => {
-      const { FixOrchestrator } = await import('./fixer/fix-orchestrator.js')
-
       try {
-        const orchestrator = new FixOrchestrator({
-          dryRun: options.dry || false,
-          verbose: options.verbose || false,
-        })
-
-        const result = await orchestrator.applyFixes(promptsDir)
-
-        console.log('\n' + '='.repeat(60))
-        console.log(`  Total prompts: ${result.total}`)
-        console.log(`  Applied: ${result.applied}`)
-        console.log(`  Skipped: ${result.skipped}`)
-        console.log(`  Failed: ${result.failed}`)
-        console.log('='.repeat(60))
-
-        process.exit(result.failed > 0 ? 1 : 0)
+        await handleApplyFixesCommand(promptsDir, options)
       } catch (error) {
         console.error('Error:', error.message)
         if (options.verbose) {
