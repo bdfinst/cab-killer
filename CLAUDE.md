@@ -127,8 +127,17 @@ node src/index.js --changed --path .
 # Review files changed since a specific branch
 node src/index.js --since main --path .
 
-# Apply fixes from saved prompts
+# Apply fixes from saved prompts (with automatic validation)
 node src/index.js apply-fixes ./prompts-output --verbose
+
+# Apply fixes with custom repository path
+node src/index.js apply-fixes ./prompts-output --repo /path/to/target/repo
+
+# Apply fixes without running tests/build/lint
+node src/index.js apply-fixes ./prompts-output --skip-tests --skip-build --skip-lint
+
+# Dry run to preview what would be applied
+node src/index.js apply-fixes ./prompts-output --dry
 ```
 
 ## Configuration
@@ -151,6 +160,34 @@ Create `config/review-config.json`:
   }
 }
 ```
+
+## Fix Application with Validation
+
+When applying fixes, the system now:
+
+1. **Loads target repository rules** - Automatically detects and includes rules from:
+   - `CLAUDE.md` - Project-specific AI assistant guidelines
+   - `.clinerules` - Custom linting/coding rules
+   - `.claude/rules/index.md` - Structured rules directory
+   - `CONTRIBUTING.md` - Contribution guidelines
+   - `README.md` - Project overview and conventions
+
+2. **Applies fixes with context** - Each fix agent receives:
+   - The specific issue to fix
+   - All relevant repository rules and conventions
+   - Instructions to follow coding standards
+
+3. **Validates changes** - After each fix, automatically runs (if configured):
+   - **Lint** - Code style and quality checks
+   - **Build** - Compilation and build verification
+   - **Tests** - Full test suite execution
+
+4. **Reports validation results** - Fixes are categorized as:
+   - **Applied & Validated** - Successfully applied and passed all checks
+   - **Validation Failed** - Applied but failed lint/build/tests
+   - **Failed** - Could not apply the fix
+
+This ensures that all fixes adhere to repository standards and don't break existing functionality.
 
 ## Claude Setup Review Agent Details
 

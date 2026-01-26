@@ -169,13 +169,19 @@ async function handleApplyFixesCommand(promptsDir, options) {
   const orchestrator = new FixOrchestrator({
     dryRun: options.dry || false,
     verbose: options.verbose || false,
+    runTests: !options.skipTests,
+    runBuild: !options.skipBuild,
+    runLint: !options.skipLint,
+    repoPath: options.repo || process.cwd(),
   })
 
   const result = await orchestrator.applyFixes(promptsDir)
   const report = orchestrator.generateReport(result)
   console.log(report)
 
-  process.exit(result.failed > 0 ? 1 : 0)
+  const exitCode =
+    result.failed > 0 || result.validationFailed > 0 ? 1 : 0
+  process.exit(exitCode)
 }
 
 /**
@@ -232,6 +238,10 @@ export async function main() {
     .argument('<prompts-dir>', 'Directory containing prompt JSON files')
     .option('-v, --verbose', 'Show detailed output')
     .option('-d, --dry', 'Show prompts without applying fixes')
+    .option('-r, --repo <path>', 'Target repository path', process.cwd())
+    .option('--skip-tests', 'Skip running tests after each fix')
+    .option('--skip-build', 'Skip running build after each fix')
+    .option('--skip-lint', 'Skip running lint after each fix')
     .action(async (promptsDir, options) => {
       try {
         await handleApplyFixesCommand(promptsDir, options)

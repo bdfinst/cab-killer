@@ -1,6 +1,11 @@
 import { readFile, readdir, mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
+import {
+  loadRepositoryRules,
+  formatRulesForPrompt,
+} from '../utils/repo-rules-loader.js'
+import { runTests, runBuild, runLint } from '../utils/test-runner.js'
 
 /**
  * Orchestrates applying fixes using independent Claude agents
@@ -9,10 +14,15 @@ export class FixOrchestrator {
   constructor(options = {}) {
     this.dryRun = options.dryRun || false
     this.verbose = options.verbose || false
+    this.runTests = options.runTests !== false
+    this.runBuild = options.runBuild !== false
+    this.runLint = options.runLint !== false
+    this.repoPath = options.repoPath || process.cwd()
     this.reporter = options.reporter || {
       log: (msg) => console.log(msg),
       write: (msg) => process.stdout.write(msg),
     }
+    this.repoRules = null
   }
 
   log(message) {
@@ -95,48 +105,134 @@ export class FixOrchestrator {
   }
 
   /**
+   * Load repository rules once for reuse
+   *
+   * @returns {Promise<void>}
+   */
+  async loadRepoRules() {
+    if (!this.repoRules) {
+      const rules = await loadRepositoryRules(this.repoPath)
+      this.repoRules = formatRulesForPrompt(rules)
+      if (this.verbose && rules.length > 0) {
+        this.reporter.log(
+          `Loaded ${rules.length} repository rules file(s): ${rules.map((r) => r.filename).join(', ')}`,
+        )
+      }
+    }
+  }
+
+  /**
    * Build a prompt string for Claude to fix an issue
    *
    * @param {Object} prompt - CorrectionPrompt object
    * @returns {string}
    */
   buildFixPrompt(prompt) {
-    return `Fix this code issue:
+    let fixPrompt = `Fix this code issue:
 
 **Issue:** ${prompt.instruction}
 **Location:** ${prompt.context}
-**Files:** ${prompt.affectedFiles.join(', ')}
+**Files:** ${prompt.affectedFiles.join(', ')}`
+
+    if (this.repoRules) {
+      fixPrompt += `\n${this.repoRules}`
+    }
+
+    fixPrompt += `
 
 Instructions:
 1. Read the affected file(s)
-2. Make the minimal fix required
+2. Make the minimal fix required following the repository rules and conventions
 3. Do not change anything else
+4. Ensure your changes follow all coding standards and conventions listed above
 
 Apply the fix now.`
+
+    return fixPrompt
+  }
+
+  /**
+   * Run validation checks (lint, build, tests) after a fix
+   *
+   * @returns {Promise<{success: boolean, output: string, failedStep: string|null}>}
+   */
+  async runValidation() {
+    const results = {
+      success: true,
+      output: '',
+      failedStep: null,
+    }
+
+    if (this.runLint) {
+      this.log('  Running lint...')
+      const lintResult = await runLint(this.repoPath, { timeout: 60000 })
+      results.output += `\nLint: ${lintResult.success ? 'PASS' : 'FAIL'}\n${lintResult.output}`
+      if (!lintResult.success) {
+        results.success = false
+        results.failedStep = 'lint'
+        return results
+      }
+    }
+
+    if (this.runBuild) {
+      this.log('  Running build...')
+      const buildResult = await runBuild(this.repoPath, { timeout: 120000 })
+      results.output += `\nBuild: ${buildResult.success ? 'PASS' : 'FAIL'}\n${buildResult.output}`
+      if (!buildResult.success) {
+        results.success = false
+        results.failedStep = 'build'
+        return results
+      }
+    }
+
+    if (this.runTests) {
+      this.log('  Running tests...')
+      const testResult = await runTests(this.repoPath, { timeout: 180000 })
+      results.output += `\nTests: ${testResult.success ? 'PASS' : 'FAIL'}\n${testResult.output}`
+      if (!testResult.success) {
+        results.success = false
+        results.failedStep = 'tests'
+        return results
+      }
+    }
+
+    return results
   }
 
   /**
    * Spawn an independent Claude agent to apply a fix
    *
    * @param {Object} prompt - CorrectionPrompt object
-   * @returns {Promise<{success: boolean, output: string}>}
+   * @returns {Promise<{success: boolean, output: string, validationFailed: boolean}>}
    */
   async spawnAgent(prompt) {
     const fixPrompt = this.buildFixPrompt(prompt)
 
     if (this.dryRun) {
       this.reporter.log(`  Prompt: ${prompt.instruction.slice(0, 80)}...`)
-      return { success: true, output: '[dry-run]' }
+      return { success: true, output: '[dry-run]', validationFailed: false }
     }
 
     return new Promise((resolve) => {
       // Use claude without --print so it can make file edits
       // Pass prompt via -p flag for non-interactive mode
       // Use --model sonnet for faster, cheaper fixes
-      const claude = spawn('claude', ['-p', fixPrompt, '--model', 'sonnet', '--allowedTools', 'Read,Edit,Write'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env },
-      })
+      const claude = spawn(
+        'claude',
+        [
+          '-p',
+          fixPrompt,
+          '--model',
+          'sonnet',
+          '--allowedTools',
+          'Read,Edit,Write',
+        ],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env },
+          cwd: this.repoPath,
+        },
+      )
 
       let stdout = ''
       let stderr = ''
@@ -153,10 +249,24 @@ Apply the fix now.`
         stderr += data.toString()
       })
 
-      claude.on('close', (code) => {
+      claude.on('close', async (code) => {
+        if (code !== 0) {
+          resolve({
+            success: false,
+            output: stderr || stdout,
+            validationFailed: false,
+          })
+          return
+        }
+
+        // Fix was applied, now run validation
+        const validation = await this.runValidation()
+
         resolve({
-          success: code === 0,
-          output: code === 0 ? stdout : stderr || stdout,
+          success: validation.success,
+          output: stdout + validation.output,
+          validationFailed: !validation.success,
+          failedStep: validation.failedStep,
         })
       })
 
@@ -164,6 +274,7 @@ Apply the fix now.`
         resolve({
           success: false,
           output: `Failed to spawn Claude: ${err.message}`,
+          validationFailed: false,
         })
       })
     })
@@ -173,14 +284,19 @@ Apply the fix now.`
    * Apply all fixes from a prompts directory
    *
    * @param {string} promptsDir - Directory containing prompt JSON files
-   * @returns {Promise<{total: number, applied: number, failed: number, appliedItems: Array, failedItems: Array}>}
+   * @returns {Promise<{total: number, applied: number, failed: number, validationFailed: number, appliedItems: Array, failedItems: Array, validationFailedItems: Array}>}
    */
   async applyFixes(promptsDir) {
+    // Load repository rules once at the start
+    await this.loadRepoRules()
+
     const prompts = await this.loadPrompts(promptsDir)
     let applied = 0
     let failed = 0
+    let validationFailed = 0
     const appliedItems = []
     const failedItems = []
+    const validationFailedItems = []
 
     this.reporter.log(`Found ${prompts.length} prompts in ${promptsDir}`)
 
@@ -195,7 +311,7 @@ Apply the fix now.`
 
       if (result.success) {
         applied++
-        this.reporter.log(`  Status: Applied`)
+        this.reporter.log(`  Status: Applied & Validated`)
         appliedItems.push({
           file,
           category: prompt.category,
@@ -205,9 +321,22 @@ Apply the fix now.`
         if (!this.dryRun) {
           await this.markComplete(promptsDir, file)
         }
+      } else if (result.validationFailed) {
+        validationFailed++
+        this.reporter.log(`  Status: Applied but validation failed`)
+        this.reporter.log(`  Failed step: ${result.failedStep}`)
+        const errorMsg = this.extractErrorMessage(result.output)
+        this.reporter.log(`  Details: ${errorMsg}`)
+        validationFailedItems.push({
+          file,
+          category: prompt.category,
+          instruction: prompt.instruction,
+          affectedFiles: prompt.affectedFiles,
+          failedStep: result.failedStep,
+          reason: errorMsg,
+        })
       } else {
         failed++
-        // Extract a meaningful error message from the output
         const errorMsg = this.extractErrorMessage(result.output)
         this.reporter.log(`  Status: Failed`)
         this.reporter.log(`  Reason: ${errorMsg}`)
@@ -225,8 +354,10 @@ Apply the fix now.`
       total: prompts.length,
       applied,
       failed,
+      validationFailed,
       appliedItems,
       failedItems,
+      validationFailedItems,
     }
   }
 
@@ -241,14 +372,29 @@ Apply the fix now.`
     report += '  FIX SUMMARY REPORT\n'
     report += '='.repeat(60) + '\n\n'
 
-    report += `Total: ${result.total} | Applied: ${result.applied} | Failed: ${result.failed}\n\n`
+    report += `Total: ${result.total} | Applied: ${result.applied} | Failed: ${result.failed}`
+    if (result.validationFailed > 0) {
+      report += ` | Validation Failed: ${result.validationFailed}`
+    }
+    report += '\n\n'
 
     if (result.appliedItems.length > 0) {
-      report += '--- APPLIED ---\n\n'
+      report += '--- APPLIED & VALIDATED ---\n\n'
       for (const item of result.appliedItems) {
         report += `[${item.category}] ${item.file}\n`
         report += `  ${item.instruction.slice(0, 100)}${item.instruction.length > 100 ? '...' : ''}\n`
         report += `  Files: ${item.affectedFiles.join(', ')}\n\n`
+      }
+    }
+
+    if (result.validationFailedItems && result.validationFailedItems.length > 0) {
+      report += '--- VALIDATION FAILED ---\n\n'
+      for (const item of result.validationFailedItems) {
+        report += `[${item.category}] ${item.file}\n`
+        report += `  ${item.instruction.slice(0, 100)}${item.instruction.length > 100 ? '...' : ''}\n`
+        report += `  Files: ${item.affectedFiles.join(', ')}\n`
+        report += `  Failed step: ${item.failedStep}\n`
+        report += `  Reason: ${item.reason}\n\n`
       }
     }
 
