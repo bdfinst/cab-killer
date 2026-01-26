@@ -7,7 +7,16 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createAgentRegistry } from './agents/registry.js'
 import { Orchestrator } from './orchestrator/orchestrator.js'
 import { PromptGenerator } from './orchestrator/prompt-generator.js'
-import { discoverFiles, readFileContent } from './utils/file-utils.js'
+import {
+  discoverFiles,
+  readFileContent,
+  filterByExtension,
+} from './utils/file-utils.js'
+import {
+  isGitRepo,
+  getChangedFiles,
+  getChangedFilesSinceRef,
+} from './utils/git-utils.js'
 import { createConfig } from './models/config.js'
 import { FixerLoop } from './fixer/fixer-loop.js'
 
@@ -37,13 +46,40 @@ async function loadConfig(configPath) {
 
 /**
  * Load files from target path
+ *
+ * @param {string} targetPath - Path to scan
+ * @param {Object} options
+ * @param {string} [options.pattern] - Glob pattern for files
+ * @param {string[]} [options.ignore] - Patterns to ignore
+ * @param {boolean} [options.changedOnly] - Only include files changed since last commit
+ * @param {string} [options.since] - Git ref to compare against (for changed files)
  */
 async function loadFiles(targetPath, options = {}) {
   const absolutePath = resolve(targetPath)
-  const filePaths = await discoverFiles(absolutePath, {
-    pattern: options.pattern || '**/*.{js,ts,jsx,tsx,mjs,cjs}',
-    ignore: options.ignore || [],
-  })
+  let filePaths
+
+  if (options.changedOnly || options.since) {
+    // Git diff mode - only changed files
+    if (!isGitRepo(absolutePath)) {
+      throw new Error('--changed requires a git repository')
+    }
+
+    if (options.since) {
+      filePaths = getChangedFilesSinceRef(absolutePath, options.since)
+    } else {
+      filePaths = getChangedFiles(absolutePath)
+    }
+
+    // Filter to only code files
+    const codeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs']
+    filePaths = filterByExtension(filePaths, codeExtensions)
+  } else {
+    // Full scan mode
+    filePaths = await discoverFiles(absolutePath, {
+      pattern: options.pattern || '**/*.{js,ts,jsx,tsx,mjs,cjs}',
+      ignore: options.ignore || [],
+    })
+  }
 
   const files = []
   for (const filePath of filePaths) {
@@ -170,17 +206,38 @@ export async function main() {
     )
     .option('--json', 'Output results as JSON', false)
     .option('--markdown', 'Output results as markdown', false)
+    .option(
+      '--use-claude-code',
+      'Use Claude Code CLI instead of API (avoids rate limits)',
+      false,
+    )
+    .option(
+      '--changed',
+      'Only review files changed since last commit (requires git)',
+      false,
+    )
+    .option(
+      '--since <ref>',
+      'Only review files changed since git ref (e.g., main, HEAD~3)',
+    )
     .action(async (targetPath, options) => {
       try {
         // Load configuration
         const config = await loadConfig(options.config)
 
-        // Initialize Anthropic client
-        const client = new Anthropic()
-
-        // Create agent registry with client
+        // Create agent registry
         const promptsDir = join(__dirname, '..', 'prompts')
-        const registry = createAgentRegistry({ promptsDir, client })
+        let registry
+        let client = null
+
+        if (options.useClaudeCode) {
+          // Use Claude Code CLI - no API client needed
+          registry = createAgentRegistry({ promptsDir, useClaudeCode: true })
+        } else {
+          // Use Anthropic API
+          client = new Anthropic()
+          registry = createAgentRegistry({ promptsDir, client })
+        }
 
         // Create orchestrator
         const orchestrator = new Orchestrator(registry, config)
@@ -193,10 +250,18 @@ export async function main() {
         }
 
         // Load files
+        const scanMode = options.changed
+          ? 'changed files'
+          : options.since
+            ? `files changed since ${options.since}`
+            : 'all files'
         if (options.verbose) {
-          console.log(`Loading files from ${targetPath}...`)
+          console.log(`Loading ${scanMode} from ${targetPath}...`)
         }
-        const files = await loadFiles(targetPath)
+        const files = await loadFiles(targetPath, {
+          changedOnly: options.changed,
+          since: options.since,
+        })
         if (options.verbose) {
           console.log(`Found ${files.length} files`)
         }
@@ -219,6 +284,11 @@ export async function main() {
 
           if (options.fix && !options.dryRun) {
             // Full fix loop with corrections
+            if (!client) {
+              throw new Error(
+                '--fix requires API access (cannot use with --use-claude-code)',
+              )
+            }
             const fixer = new FixerLoop(orchestrator, client, {
               maxIterations,
               dryRun: options.dryRun,

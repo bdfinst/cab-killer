@@ -9,3 +9,9 @@ export {
   chunkFiles,
   truncateContent,
 } from './context-window.js'
+
+export {
+  isGitRepo,
+  getChangedFiles,
+  getChangedFilesSinceRef,
+} from './git-utils.js'

@@ -1,4 +1,5 @@
 import { LLMReviewAgent } from './llm-agent.js'
+import { ClaudeCodeAgent } from './claude-code-agent.js'
 import { PromptLoader } from './prompt-loader.js'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -81,16 +82,23 @@ export class AgentRegistry {
  * @param {Object} [options]
  * @param {string} [options.promptsDir] - Directory containing prompts
  * @param {Object} [options.client] - Anthropic client
+ * @param {boolean} [options.useClaudeCode] - Use Claude Code CLI instead of API
  * @returns {AgentRegistry}
  */
 export function createAgentRegistry(options = {}) {
-  const { promptsDir = DEFAULT_PROMPTS_DIR, client = null } = options
+  const {
+    promptsDir = DEFAULT_PROMPTS_DIR,
+    client = null,
+    useClaudeCode = false,
+  } = options
 
   const registry = new AgentRegistry()
   const loader = new PromptLoader(promptsDir)
 
   for (const agentName of DEFAULT_AGENTS) {
-    const agent = new LLMReviewAgent(agentName, loader, client)
+    const agent = useClaudeCode
+      ? new ClaudeCodeAgent(agentName, loader)
+      : new LLMReviewAgent(agentName, loader, client)
     registry.register(agent)
   }
 

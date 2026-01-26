@@ -1,71 +1,75 @@
 import { BaseReviewAgent } from './base-agent.js'
+import { spawn } from 'node:child_process'
 
 /**
- * Review agent that uses LLM to analyze code
+ * Review agent that uses Claude Code CLI instead of API
  */
-export class LLMReviewAgent extends BaseReviewAgent {
+export class ClaudeCodeAgent extends BaseReviewAgent {
   /**
    * @param {string} name - Agent name
    * @param {PromptLoader} promptLoader - Prompt loader instance
-   * @param {Object} [client] - Anthropic client (optional, for testing)
    */
-  constructor(name, promptLoader, client = null) {
+  constructor(name, promptLoader) {
     super(name)
     this.promptLoader = promptLoader
-    this.client = client
     this.prompt = null
   }
 
   /**
-   * Review files using LLM
+   * Review files using Claude Code CLI
    *
    * @param {Array<{path: string, content: string}>} files - Files to review
    * @returns {Promise<Object>} ReviewResult
    */
   async review(files) {
-    if (!this.client) {
-      throw new Error('Anthropic client not configured')
-    }
-
     const prompt = await this.buildPrompt(files)
-
-    const response = await this.callWithRetry(prompt)
-
-    const responseText = response.content[0].text
-    return this.parseResponse(responseText)
+    const response = await this.callClaudeCode(prompt)
+    return this.parseResponse(response)
   }
 
   /**
-   * Call API with retry and exponential backoff for rate limits
+   * Call Claude Code CLI with prompt
    *
    * @param {string} prompt - The prompt to send
-   * @param {number} [maxRetries] - Maximum retry attempts
-   * @returns {Promise<Object>} API response
+   * @returns {Promise<string>} Response text
    */
-  async callWithRetry(prompt, maxRetries = 5) {
-    let lastError
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        return await this.client.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4096,
-          messages: [{ role: 'user', content: prompt }],
-        })
-      } catch (error) {
-        lastError = error
-        if (error.status === 429) {
-          // Rate limit - wait with exponential backoff
-          const delay = Math.min(1000 * Math.pow(2, attempt), 60000)
-          console.log(
-            `Rate limited, waiting ${delay / 1000}s before retry ${attempt + 1}/${maxRetries}...`,
-          )
-          await new Promise((resolve) => setTimeout(resolve, delay))
+  async callClaudeCode(prompt) {
+    return new Promise((resolve, reject) => {
+      // Use --print for non-interactive mode, pipe prompt via stdin
+      const claude = spawn('claude', ['--print'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env },
+      })
+
+      let stdout = ''
+      let stderr = ''
+
+      claude.stdout.on('data', (data) => {
+        stdout += data.toString()
+      })
+
+      claude.stderr.on('data', (data) => {
+        stderr += data.toString()
+      })
+
+      claude.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout)
         } else {
-          throw error
+          reject(
+            new Error(`Claude Code failed (code ${code}): ${stderr || stdout}`),
+          )
         }
-      }
-    }
-    throw lastError
+      })
+
+      claude.on('error', (err) => {
+        reject(new Error(`Failed to spawn Claude Code: ${err.message}`))
+      })
+
+      // Write prompt to stdin and close
+      claude.stdin.write(prompt)
+      claude.stdin.end()
+    })
   }
 
   /**
@@ -104,17 +108,16 @@ ${filesContext}
 ## Output Format
 ${this.prompt.outputFormat}
 
-Please analyze the code above and return your review as JSON.`
+Please analyze the code above and return your review as JSON only, no other text.`
   }
 
   /**
-   * Parse LLM response into ReviewResult
+   * Parse response into ReviewResult
    *
-   * @param {string} response - Raw LLM response
+   * @param {string} response - Raw response
    * @returns {Object} ReviewResult
    */
   parseResponse(response) {
-    // Try to extract JSON from response (may be wrapped in markdown)
     let jsonStr = response
 
     // Check for markdown code block
@@ -123,16 +126,21 @@ Please analyze the code above and return your review as JSON.`
       jsonStr = codeBlockMatch[1].trim()
     }
 
+    // Try to find JSON object in response
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[0]
+    }
+
     let parsed
     try {
       parsed = JSON.parse(jsonStr)
     } catch {
       throw new Error(
-        `Failed to parse LLM response as JSON: ${response.slice(0, 200)}`,
+        `Failed to parse response as JSON: ${response.slice(0, 200)}`,
       )
     }
 
-    // Validate and format issues
     const issues = (parsed.issues || []).map((issue) =>
       this.createIssue({
         severity: issue.severity || 'warning',
