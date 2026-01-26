@@ -132,7 +132,8 @@ Apply the fix now.`
     return new Promise((resolve) => {
       // Use claude without --print so it can make file edits
       // Pass prompt via -p flag for non-interactive mode
-      const claude = spawn('claude', ['-p', fixPrompt, '--allowedTools', 'Read,Edit,Write'], {
+      // Use --model sonnet for faster, cheaper fixes
+      const claude = spawn('claude', ['-p', fixPrompt, '--model', 'sonnet', '--allowedTools', 'Read,Edit,Write'], {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env },
       })

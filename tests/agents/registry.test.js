@@ -89,7 +89,15 @@ describe('createAgentRegistry', () => {
     const registry = createAgentRegistry()
     const agent = registry.get('complexity-review')
 
-    const result = await agent.review([])
+    // Provide a simple code sample for the agent to review
+    const files = [
+      {
+        path: 'example.js',
+        content: 'function add(a, b) { return a + b; }',
+      },
+    ]
+
+    const result = await agent.review(files)
 
     assert.strictEqual(result.agentName, 'complexity-review')
     assert.ok(['pass', 'warn', 'fail'].includes(result.status))

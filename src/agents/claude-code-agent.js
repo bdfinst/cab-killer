@@ -37,7 +37,8 @@ export class ClaudeCodeAgent extends BaseReviewAgent {
   async callClaudeCode(prompt) {
     return new Promise((resolve, reject) => {
       // Use --print for non-interactive mode, pipe prompt via stdin
-      const claude = spawn('claude', ['--print'], {
+      // Use --model sonnet for faster, cheaper reviews
+      const claude = spawn('claude', ['--print', '--model', 'sonnet'], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
       })

@@ -41,7 +41,7 @@ async function loadAndValidateFiles(targetPath, options) {
  * Mode handlers for different execution strategies
  */
 const modeHandlers = {
-  async single(orchestrator, files, options) {
+  async single(orchestrator, files, _options) {
     const results = await orchestrator.runAllAgents(files)
     return orchestrator.aggregateResults(results)
   },
@@ -52,7 +52,7 @@ const modeHandlers = {
       parallel: options.parallel,
     })
   },
-  async parallel(orchestrator, files, options) {
+  async parallel(orchestrator, files, _options) {
     const results = await orchestrator.runAllAgentsParallel(files)
     return orchestrator.aggregateResults(results)
   },

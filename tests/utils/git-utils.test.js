@@ -1,11 +1,10 @@
-import { describe, it, beforeEach, afterEach, mock } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { isGitRepo, getChangedFiles, getChangedFilesSinceRef } from '../../src/utils/git-utils.js'
 import { tmpdir } from 'node:os'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
-import * as childProcess from 'node:child_process'
 
 describe('git-utils', () => {
   describe('isGitRepo', () => {
@@ -105,23 +104,13 @@ describe('git-utils', () => {
       )
     })
 
-    it('should throw error when git command fails due to permission errors', () => {
-      const originalExecSync = childProcess.execSync
-      mock.method(childProcess, 'execSync', () => {
-        const error = new Error('fatal: could not read from remote repository')
-        error.status = 128
-        error.stderr = Buffer.from('Permission denied (publickey)')
-        throw error
-      })
-
-      try {
-        assert.throws(
-          () => getChangedFiles(tempDir),
-          /fatal:|Permission denied/
-        )
-      } finally {
-        childProcess.execSync = originalExecSync
-      }
+    it('should throw error when git command fails due to invalid repo state', () => {
+      // Corrupt the git repo by creating an invalid .git/HEAD
+      writeFileSync(join(tempDir, '.git', 'HEAD'), 'invalid content')
+      assert.throws(
+        () => getChangedFiles(tempDir),
+        Error
+      )
     })
   })
 
