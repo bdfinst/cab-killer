@@ -5,6 +5,7 @@ A multi-agent code review system that independently reviews code written by codi
 ## Project Overview
 
 This system provides automated code review through specialized agents:
+
 - **Test Review Agent**: Evaluates test quality, coverage, and effectiveness
 - **Structure Review Agent**: Analyzes code organization and architecture
 - **Naming Review Agent**: Checks naming clarity and consistency
@@ -13,6 +14,7 @@ This system provides automated code review through specialized agents:
 - **Claude Setup Review Agent**: Reviews CLAUDE.md content, structure, rules, and skill definitions
 
 An **Orchestrator** coordinates these agents and can:
+
 - Run a single review agent at a time
 - Run all agents sequentially
 - Loop until all review comments are addressed
@@ -67,6 +69,7 @@ config/                  # Configuration files
 ## Review Result Format
 
 Each agent produces a review result object:
+
 ```javascript
 // ReviewResult
 {
@@ -89,6 +92,7 @@ Each agent produces a review result object:
 ## Correction Prompt Format
 
 The orchestrator converts review results into prompts for the coding agent:
+
 ```javascript
 // CorrectionPrompt
 {
@@ -119,6 +123,7 @@ node src/index.js --mode single --output prompts.json --path ./code-to-review
 ## Configuration
 
 Create `config/review-config.json`:
+
 ```json
 {
   "agents": {
@@ -141,6 +146,7 @@ Create `config/review-config.json`:
 The Claude Setup Review Agent examines the project's AI assistant configuration:
 
 **CLAUDE.md checks:**
+
 - File exists and has proper markdown structure
 - Contains project overview explaining what the codebase does
 - Documents architecture and directory structure
@@ -149,16 +155,19 @@ The Claude Setup Review Agent examines the project's AI assistant configuration:
 - Instructions are clear enough for an AI assistant to follow
 
 **Rules checks:**
+
 - Presence of `.clinerules` or `.claude/rules/` definitions
 - Rules are specific and actionable
 - No conflicting or redundant rules
 
 **Skills checks:**
+
 - Common workflows have skill definitions (commit, test, deploy, etc.)
 - Skills reference correct file paths and commands
 - Skills are documented with clear triggers
 
 **Consistency checks:**
+
 - CLAUDE.md directory structure matches actual project
 - Referenced files and paths exist
 - Commands in documentation actually work
