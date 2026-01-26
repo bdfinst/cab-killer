@@ -169,6 +169,7 @@ async function handleApplyFixesCommand(promptsDir, options) {
   const orchestrator = new FixOrchestrator({
     dryRun: options.dry || false,
     verbose: options.verbose || false,
+    showProgress: !options.noProgress,
     runTests: !options.skipTests,
     runBuild: !options.skipBuild,
     runLint: !options.skipLint,
@@ -242,6 +243,7 @@ export async function main() {
     .option('--skip-tests', 'Skip running tests after each fix')
     .option('--skip-build', 'Skip running build after each fix')
     .option('--skip-lint', 'Skip running lint after each fix')
+    .option('--no-progress', 'Disable progress and token usage display')
     .action(async (promptsDir, options) => {
       try {
         await handleApplyFixesCommand(promptsDir, options)

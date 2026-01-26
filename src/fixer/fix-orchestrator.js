@@ -6,6 +6,7 @@ import {
   formatRulesForPrompt,
 } from '../utils/repo-rules-loader.js'
 import { runTests, runBuild, runLint } from '../utils/test-runner.js'
+import { TokenTracker } from '../utils/token-tracker.js'
 
 /**
  * Orchestrates applying fixes using independent Claude agents
@@ -14,6 +15,7 @@ export class FixOrchestrator {
   constructor(options = {}) {
     this.dryRun = options.dryRun || false
     this.verbose = options.verbose || false
+    this.showProgress = options.showProgress !== false
     this.runTests = options.runTests !== false
     this.runBuild = options.runBuild !== false
     this.runLint = options.runLint !== false
@@ -23,6 +25,12 @@ export class FixOrchestrator {
       write: (msg) => process.stdout.write(msg),
     }
     this.repoRules = null
+    this.tokenTracker = new TokenTracker({
+      maxTokens: 200000,
+      verbose: this.verbose,
+      reporter: this.reporter,
+    })
+    this.startTime = null
   }
 
   log(message) {
@@ -148,6 +156,9 @@ Instructions:
 
 Apply the fix now.`
 
+    // Track token usage for the prompt
+    this.tokenTracker.addText(fixPrompt)
+
     return fixPrompt
   }
 
@@ -250,6 +261,9 @@ Apply the fix now.`
       })
 
       claude.on('close', async (code) => {
+        // Track response tokens
+        this.tokenTracker.addText(stdout)
+
         if (code !== 0) {
           resolve({
             success: false,
@@ -281,12 +295,62 @@ Apply the fix now.`
   }
 
   /**
+   * Format elapsed time
+   *
+   * @param {number} ms - Milliseconds
+   * @returns {string} Formatted time
+   */
+  formatElapsedTime(ms) {
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`
+    } else {
+      return `${seconds}s`
+    }
+  }
+
+  /**
+   * Display progress information
+   *
+   * @param {number} current - Current item number (1-indexed)
+   * @param {number} total - Total items
+   */
+  displayProgress(current, total) {
+    if (!this.showProgress) {
+      return
+    }
+
+    const elapsed = Date.now() - this.startTime
+    const avgTime = elapsed / current
+    const remaining = avgTime * (total - current)
+    const percentage = ((current / total) * 100).toFixed(1)
+
+    this.reporter.log(
+      `  Progress: ${current}/${total} (${percentage}%) | ` +
+        `Elapsed: ${this.formatElapsedTime(elapsed)} | ` +
+        `ETA: ${this.formatElapsedTime(remaining)}`,
+    )
+
+    // Display token usage
+    if (this.tokenTracker) {
+      this.reporter.log(`  ${this.tokenTracker.formatProgressBar(30)}`)
+    }
+  }
+
+  /**
    * Apply all fixes from a prompts directory
    *
    * @param {string} promptsDir - Directory containing prompt JSON files
-   * @returns {Promise<{total: number, applied: number, failed: number, validationFailed: number, appliedItems: Array, failedItems: Array, validationFailedItems: Array}>}
+   * @returns {Promise<{total: number, applied: number, failed: number, validationFailed: number, appliedItems: Array, failedItems: Array, validationFailedItems: Array, tokenUsage: Object, duration: number}>}
    */
   async applyFixes(promptsDir) {
+    this.startTime = Date.now()
+
     // Load repository rules once at the start
     await this.loadRepoRules()
 
@@ -299,6 +363,11 @@ Apply the fix now.`
     const validationFailedItems = []
 
     this.reporter.log(`Found ${prompts.length} prompts in ${promptsDir}`)
+    if (this.showProgress) {
+      this.reporter.log(
+        `Token tracking enabled (max: ${this.tokenTracker.maxTokens.toLocaleString()})`,
+      )
+    }
 
     for (let i = 0; i < prompts.length; i++) {
       const { file, prompt } = prompts[i]
@@ -348,7 +417,12 @@ Apply the fix now.`
           reason: errorMsg,
         })
       }
+
+      // Show progress after each fix
+      this.displayProgress(i + 1, prompts.length)
     }
+
+    const duration = Date.now() - this.startTime
 
     return {
       total: prompts.length,
@@ -358,6 +432,8 @@ Apply the fix now.`
       appliedItems,
       failedItems,
       validationFailedItems,
+      tokenUsage: this.tokenTracker.getSummary(),
+      duration,
     }
   }
 
@@ -376,7 +452,17 @@ Apply the fix now.`
     if (result.validationFailed > 0) {
       report += ` | Validation Failed: ${result.validationFailed}`
     }
-    report += '\n\n'
+    report += '\n'
+
+    // Add duration and token usage
+    if (result.duration) {
+      report += `Duration: ${this.formatElapsedTime(result.duration)}\n`
+    }
+    if (result.tokenUsage) {
+      report += `Token Usage: ${result.tokenUsage.current.toLocaleString()}/${result.tokenUsage.max.toLocaleString()} `
+      report += `(${result.tokenUsage.percentage.toFixed(1)}%)\n`
+    }
+    report += '\n'
 
     if (result.appliedItems.length > 0) {
       report += '--- APPLIED & VALIDATED ---\n\n'

@@ -127,7 +127,7 @@ node src/index.js --changed --path .
 # Review files changed since a specific branch
 node src/index.js --since main --path .
 
-# Apply fixes from saved prompts (with automatic validation)
+# Apply fixes from saved prompts (with automatic validation and progress tracking)
 node src/index.js apply-fixes ./prompts-output --verbose
 
 # Apply fixes with custom repository path
@@ -135,6 +135,9 @@ node src/index.js apply-fixes ./prompts-output --repo /path/to/target/repo
 
 # Apply fixes without running tests/build/lint
 node src/index.js apply-fixes ./prompts-output --skip-tests --skip-build --skip-lint
+
+# Disable progress and token usage display
+node src/index.js apply-fixes ./prompts-output --no-progress
 
 # Dry run to preview what would be applied
 node src/index.js apply-fixes ./prompts-output --dry
@@ -186,6 +189,12 @@ When applying fixes, the system now:
    - **Applied & Validated** - Successfully applied and passed all checks
    - **Validation Failed** - Applied but failed lint/build/tests
    - **Failed** - Could not apply the fix
+
+5. **Displays progress automatically** - Shows real-time progress including:
+   - Current fix number and total count
+   - Estimated time elapsed and remaining
+   - Token usage with visual progress bar
+   - Completion percentage
 
 This ensures that all fixes adhere to repository standards and don't break existing functionality.
 
