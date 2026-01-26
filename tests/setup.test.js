@@ -22,7 +22,6 @@ describe('Project Setup', () => {
     const pkg = loadPackageJson()
     const deps = pkg.dependencies
 
-    assert.ok(deps['@anthropic-ai/sdk'], 'Missing @anthropic-ai/sdk')
     assert.ok(deps['commander'], 'Missing commander')
     assert.ok(deps['glob'], 'Missing glob')
   })

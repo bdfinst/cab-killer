@@ -1,9 +1,7 @@
 import { program } from 'commander'
-import { readFile } from 'node:fs/promises'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Anthropic from '@anthropic-ai/sdk'
 import { createAgentRegistry } from './agents/registry.js'
 import { Orchestrator } from './orchestrator/orchestrator.js'
 import { PromptGenerator } from './orchestrator/prompt-generator.js'
@@ -18,7 +16,6 @@ import {
   getChangedFilesSinceRef,
 } from './utils/git-utils.js'
 import { createConfig } from './models/config.js'
-import { FixerLoop } from './fixer/fixer-loop.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -197,19 +194,12 @@ export async function main() {
     .option('-o, --output <file>', 'Output results to file')
     .option('-c, --config <file>', 'Path to config file')
     .option('-v, --verbose', 'Show detailed output', false)
-    .option('--fix', 'Enable auto-fix loop', false)
-    .option('--max-fix-iterations <n>', 'Maximum fix iterations', '5')
-    .option(
-      '--dry-run',
-      'Show what would be done without making changes',
-      false,
-    )
+    .option('--max-iterations <n>', 'Maximum loop iterations', '5')
     .option('--json', 'Output results as JSON', false)
     .option('--markdown', 'Output results as markdown', false)
     .option(
-      '--use-claude-code',
-      'Use Claude Code CLI instead of API (avoids rate limits)',
-      false,
+      '--prompts-output <dir>',
+      'Save correction prompts to directory (one file per prompt) for independent agents',
     )
     .option(
       '--changed',
@@ -225,19 +215,9 @@ export async function main() {
         // Load configuration
         const config = await loadConfig(options.config)
 
-        // Create agent registry
+        // Create agent registry (uses Claude Code CLI)
         const promptsDir = join(__dirname, '..', 'prompts')
-        let registry
-        let client = null
-
-        if (options.useClaudeCode) {
-          // Use Claude Code CLI - no API client needed
-          registry = createAgentRegistry({ promptsDir, useClaudeCode: true })
-        } else {
-          // Use Anthropic API
-          client = new Anthropic()
-          registry = createAgentRegistry({ promptsDir, client })
-        }
+        const registry = createAgentRegistry({ promptsDir })
 
         // Create orchestrator
         const orchestrator = new Orchestrator(registry, config)
@@ -278,36 +258,13 @@ export async function main() {
           // Single agent mode
           const result = await orchestrator.runSingleAgent(options.agent, files)
           aggregated = orchestrator.aggregateResults([result])
-        } else if (options.mode === 'loop' || options.fix) {
-          // Loop mode
-          const maxIterations = parseInt(options.maxFixIterations, 10)
-
-          if (options.fix && !options.dryRun) {
-            // Full fix loop with corrections
-            if (!client) {
-              throw new Error(
-                '--fix requires API access (cannot use with --use-claude-code)',
-              )
-            }
-            const fixer = new FixerLoop(orchestrator, client, {
-              maxIterations,
-              dryRun: options.dryRun,
-            })
-
-            if (options.verbose) {
-              fixer.setProgressCallback(({ message }) => {
-                console.log(`[fixer] ${message}`)
-              })
-            }
-
-            aggregated = await fixer.run(files)
-          } else {
-            // Review-only loop
-            aggregated = await orchestrator.runLoop(files, {
-              maxIterations,
-              parallel: options.parallel,
-            })
-          }
+        } else if (options.mode === 'loop') {
+          // Loop mode - review until no issues or max iterations
+          const maxIterations = parseInt(options.maxIterations, 10)
+          aggregated = await orchestrator.runLoop(files, {
+            maxIterations,
+            parallel: options.parallel,
+          })
         } else if (options.parallel) {
           // Parallel mode
           const results = await orchestrator.runAllAgentsParallel(files)
@@ -339,11 +296,28 @@ export async function main() {
         // Generate correction prompts if there are issues
         if (aggregated.totalIssues > 0 && !options.fix) {
           const generator = new PromptGenerator()
-          const correctionText = generator.formatForCodingAgent(
-            aggregated.results,
-          )
+          const prompts = generator.generate(aggregated.results)
+
+          if (options.promptsOutput) {
+            // Save each prompt as a separate file for independent agents
+            await mkdir(options.promptsOutput, { recursive: true })
+
+            for (let i = 0; i < prompts.length; i++) {
+              const prompt = prompts[i]
+              const filename = `${String(i + 1).padStart(3, '0')}-${prompt.category}.json`
+              const filepath = join(options.promptsOutput, filename)
+              await writeFile(filepath, JSON.stringify(prompt, null, 2), 'utf-8')
+            }
+
+            console.log(
+              `${prompts.length} correction prompts written to ${options.promptsOutput}/`,
+            )
+          }
 
           if (options.verbose) {
+            const correctionText = generator.formatForCodingAgent(
+              aggregated.results,
+            )
             console.log('\n--- Correction Prompts ---\n')
             console.log(correctionText)
           }
@@ -351,6 +325,41 @@ export async function main() {
 
         // Exit with appropriate code
         process.exit(aggregated.overallStatus === 'fail' ? 1 : 0)
+      } catch (error) {
+        console.error('Error:', error.message)
+        if (options.verbose) {
+          console.error(error.stack)
+        }
+        process.exit(1)
+      }
+    })
+
+  // Subcommand to apply fixes from saved prompts
+  program
+    .command('apply-fixes')
+    .description('Apply fixes from saved prompts using independent Claude agents')
+    .argument('<prompts-dir>', 'Directory containing prompt JSON files')
+    .option('-v, --verbose', 'Show detailed output')
+    .option('-d, --dry', 'Show prompts without applying fixes')
+    .action(async (promptsDir, options) => {
+      const { FixOrchestrator } = await import('./fixer/fix-orchestrator.js')
+
+      try {
+        const orchestrator = new FixOrchestrator({
+          dryRun: options.dry || false,
+          verbose: options.verbose || false,
+        })
+
+        const result = await orchestrator.applyFixes(promptsDir)
+
+        console.log('\n' + '='.repeat(60))
+        console.log(`  Total prompts: ${result.total}`)
+        console.log(`  Applied: ${result.applied}`)
+        console.log(`  Skipped: ${result.skipped}`)
+        console.log(`  Failed: ${result.failed}`)
+        console.log('='.repeat(60))
+
+        process.exit(result.failed > 0 ? 1 : 0)
       } catch (error) {
         console.error('Error:', error.message)
         if (options.verbose) {

@@ -32,3 +32,4 @@ yarn-error.log*
 # Output files
 *.log
 output/
+corrections/

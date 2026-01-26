@@ -1,7 +1,10 @@
-import { describe, it } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
-import { isGitRepo } from '../../src/utils/git-utils.js'
+import { isGitRepo, getChangedFiles, getChangedFilesSinceRef } from '../../src/utils/git-utils.js'
 import { tmpdir } from 'node:os'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { execSync } from 'node:child_process'
 
 describe('git-utils', () => {
   describe('isGitRepo', () => {
@@ -12,11 +15,110 @@ describe('git-utils', () => {
     })
 
     it('should return false for non-git directory', () => {
-      const result = isGitRepo(tmpdir())
-      assert.strictEqual(result, false)
+      // Create a dedicated temp directory to ensure isolation from any parent .git
+      const nonGitDir = mkdtempSync(join(tmpdir(), 'non-git-test-'))
+      try {
+        // Create an empty .git file (not a directory, not a valid gitdir pointer)
+        // This blocks git from traversing upward to find any parent .git directory
+        writeFileSync(join(nonGitDir, '.git'), '')
+        const result = isGitRepo(nonGitDir)
+        assert.strictEqual(result, false)
+      } finally {
+        rmSync(nonGitDir, { recursive: true, force: true })
+      }
     })
   })
 
-  // Note: getChangedFiles and getChangedFilesSinceRef are harder to test
-  // in isolation as they depend on actual git state
+  describe('getChangedFiles', () => {
+    let tempDir
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), 'git-utils-test-'))
+      execSync('git init', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'pipe' })
+      // Create initial commit so we have a valid repo state
+      writeFileSync(join(tempDir, 'initial.txt'), 'initial')
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' })
+    })
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('should return empty array when no changes', () => {
+      const result = getChangedFiles(tempDir)
+      assert.deepStrictEqual(result, [])
+    })
+
+    it('should detect untracked files', () => {
+      writeFileSync(join(tempDir, 'untracked.txt'), 'content')
+      const result = getChangedFiles(tempDir)
+      assert.deepStrictEqual(result, [join(tempDir, 'untracked.txt')])
+    })
+
+    it('should detect staged files', () => {
+      writeFileSync(join(tempDir, 'staged.txt'), 'content')
+      execSync('git add staged.txt', { cwd: tempDir, stdio: 'pipe' })
+      const result = getChangedFiles(tempDir)
+      assert.deepStrictEqual(result, [join(tempDir, 'staged.txt')])
+    })
+
+    it('should detect unstaged changes to tracked files', () => {
+      writeFileSync(join(tempDir, 'initial.txt'), 'modified')
+      const result = getChangedFiles(tempDir)
+      assert.deepStrictEqual(result, [join(tempDir, 'initial.txt')])
+    })
+
+    it('should dedupe files that appear in multiple categories', () => {
+      // Modify tracked file, stage it, then modify again
+      writeFileSync(join(tempDir, 'initial.txt'), 'modified')
+      execSync('git add initial.txt', { cwd: tempDir, stdio: 'pipe' })
+      writeFileSync(join(tempDir, 'initial.txt'), 'modified again')
+      const result = getChangedFiles(tempDir)
+      // Should only appear once despite being in both staged and unstaged
+      assert.deepStrictEqual(result, [join(tempDir, 'initial.txt')])
+    })
+  })
+
+  describe('getChangedFilesSinceRef', () => {
+    let tempDir
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), 'git-utils-test-'))
+      execSync('git init', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git config user.email "test@test.com"', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git config user.name "Test"', { cwd: tempDir, stdio: 'pipe' })
+      // Create initial commit
+      writeFileSync(join(tempDir, 'initial.txt'), 'initial')
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git commit -m "initial"', { cwd: tempDir, stdio: 'pipe' })
+    })
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('should return empty array when no changes since ref', () => {
+      const result = getChangedFilesSinceRef(tempDir, 'HEAD')
+      assert.deepStrictEqual(result, [])
+    })
+
+    it('should detect files changed since HEAD~1', () => {
+      // Make a second commit with a new file
+      writeFileSync(join(tempDir, 'second.txt'), 'content')
+      execSync('git add .', { cwd: tempDir, stdio: 'pipe' })
+      execSync('git commit -m "second"', { cwd: tempDir, stdio: 'pipe' })
+
+      const result = getChangedFilesSinceRef(tempDir, 'HEAD~1')
+      assert.deepStrictEqual(result, [join(tempDir, 'second.txt')])
+    })
+
+    it('should detect uncommitted changes compared to HEAD', () => {
+      writeFileSync(join(tempDir, 'initial.txt'), 'modified')
+      const result = getChangedFilesSinceRef(tempDir, 'HEAD')
+      assert.deepStrictEqual(result, [join(tempDir, 'initial.txt')])
+    })
+  })
 })
