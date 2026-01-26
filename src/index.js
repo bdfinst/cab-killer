@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
-/**
- * Code Review Agent System - Main Entry Point
- *
- * A multi-agent code review system that independently reviews
- * code written by coding agents.
- */
+import { main } from './cli.js'
 
-console.log('Code Review Agent System - Coming soon')
+main().catch((error) => {
+  console.error('Fatal error:', error.message)
+  process.exit(1)
+})

@@ -1,0 +1,34 @@
+{
+  "agents": {
+    "test-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    },
+    "structure-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    },
+    "naming-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    },
+    "domain-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    },
+    "complexity-review": {
+      "enabled": true,
+      "severityThreshold": "warning",
+      "maxComplexity": 10
+    },
+    "claude-setup-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    }
+  },
+  "orchestrator": {
+    "maxLoopIterations": 5,
+    "failOnError": true,
+    "parallel": false
+  }
+}
