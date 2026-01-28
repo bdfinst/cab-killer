@@ -12,6 +12,7 @@ This system provides automated code review through specialized agents:
 - **Domain Review Agent**: Assesses domain separation and boundary clarity
 - **Complexity Review Agent**: Measures and flags excessive code complexity
 - **Claude Setup Review Agent**: Reviews CLAUDE.md content, structure, rules, and skill definitions
+- **Token Efficiency Review Agent**: Optimizes Claude configuration and code for minimal token usage
 
 An **Orchestrator** coordinates these agents and can:
 
@@ -48,7 +49,8 @@ src/
 │   ├── naming-review.js
 │   ├── domain-review.js
 │   ├── complexity-review.js
-│   └── claude-setup-review.js
+│   ├── claude-setup-review.js
+│   └── token-efficiency-review.js
 ├── orchestrator/        # Orchestration logic
 │   ├── orchestrator.js  # Main orchestrator
 │   ├── modes.js         # Execution modes (single/all/loop)
@@ -155,7 +157,13 @@ Create `config/review-config.json`:
     "naming-review": { "enabled": true },
     "domain-review": { "enabled": true },
     "complexity-review": { "enabled": true, "max_complexity": 10 },
-    "claude-setup-review": { "enabled": true }
+    "claude-setup-review": { "enabled": true },
+    "token-efficiency-review": {
+      "enabled": true,
+      "maxClaudeMdLength": 5000,
+      "maxFileLength": 500,
+      "maxFunctionLength": 50
+    }
   },
   "orchestrator": {
     "max_loop_iterations": 5,
@@ -229,6 +237,50 @@ The Claude Setup Review Agent examines the project's AI assistant configuration:
 - Referenced files and paths exist
 - Commands in documentation actually work
 
+## Token Efficiency Review Agent Details
+
+The Token Efficiency Review Agent optimizes Claude configuration and code structure to minimize token usage and API costs:
+
+**CLAUDE.md optimization:**
+
+- Flags overly long CLAUDE.md files (>5000 chars default)
+- Detects excessive code examples that bloat system prompts
+- Identifies verbose or redundant sections
+- Suggests moving detailed command docs to package.json references
+- Flags large ASCII diagrams that consume tokens without adding much value
+- Detects multi-step workflows that should be converted to skills
+
+**Rules optimization:**
+
+- Identifies verbose rules (>200 chars) that should be more concise
+- Detects duplicate or very similar rules
+- Flags example-heavy rule files that increase token load
+- Suggests consolidating redundant rules
+
+**Skills optimization:**
+
+- Identifies missing skills for common workflows (commit, test, deploy)
+- Detects when CLAUDE.md contains step-by-step instructions that should be skills
+- Flags overly verbose skill definitions (>2000 chars)
+- Suggests extracting repeated workflows into reusable skills
+
+**Code structure optimization:**
+
+- Flags long files (>500 lines default) that require more context tokens
+- Identifies long functions (>50 lines default) that should be split
+- Detects deeply nested code (>5 levels) that increases cognitive load
+- Finds duplicate code blocks that should be extracted to shared utilities
+- Suggests flatter code structures for better token efficiency
+
+**Documentation optimization:**
+
+- Flags verbose JSDoc comments (>15 lines) that should be external
+- Identifies tutorial-style comments that belong in docs/ not source
+- Detects excessive commented-out code that wastes tokens
+- Suggests moving detailed docs to external .md files
+
+This agent helps reduce API costs by ensuring that only essential context is loaded into Claude's prompt, while maintaining code quality and documentation clarity.
+
 ## Coding Conventions
 
 - Use `const` over `let` when variables are not reassigned (`prefer-const`)
@@ -250,6 +302,17 @@ See `eslint.config.js` for the complete linting configuration.
 
 ## Dependencies
 
-- `@anthropic-ai/sdk` - Claude API access
+### Runtime Dependencies
+
 - `commander` - CLI argument parsing
 - `glob` - File pattern matching
+
+### Development Dependencies
+
+- `@yao-pkg/pkg` - Packaging tool for creating standalone executables
+- `eslint` - Code linting
+- `prettier` - Code formatting
+
+### Optional Runtime (for fix application)
+
+- `@anthropic-ai/sdk` - Claude API access (only needed when using `apply-fixes` command)

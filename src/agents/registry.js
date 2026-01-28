@@ -14,6 +14,7 @@ const DEFAULT_AGENTS = [
   'domain-review',
   'complexity-review',
   'claude-setup-review',
+  'token-efficiency-review',
 ]
 
 /**
