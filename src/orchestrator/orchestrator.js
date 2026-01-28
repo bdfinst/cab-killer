@@ -5,10 +5,12 @@ export class Orchestrator {
   /**
    * @param {AgentRegistry} registry - Agent registry
    * @param {Object} [config] - Configuration
+   * @param {SDKClient} [sdkClient] - SDK client for usage tracking
    */
-  constructor(registry, config = {}) {
+  constructor(registry, config = {}, sdkClient = null) {
     this.registry = registry
     this.config = config
+    this.sdkClient = sdkClient
     this.onProgress = null
   }
 
@@ -117,34 +119,41 @@ export class Orchestrator {
   }
 
   /**
+   * Get aggregated usage stats from SDK client
+   *
+   * @returns {Object|null} Usage stats or null if no SDK client
+   */
+  getUsage() {
+    if (this.sdkClient) {
+      return this.sdkClient.getUsage()
+    }
+    return null
+  }
+
+  /**
    * Aggregate results from multiple agents
    *
    * @param {Array} results - Array of ReviewResults
    * @returns {Object} Aggregated summary
    */
   aggregateResults(results) {
-    const totalAgents = results.length
-    const passed = results.filter((r) => r.status === 'pass').length
-    const warned = results.filter((r) => r.status === 'warn').length
-    const failed = results.filter((r) => r.status === 'fail').length
-    const totalIssues = results.reduce(
-      (sum, r) => sum + (r.issues?.length || 0),
-      0,
+    const counts = results.reduce(
+      (statusCounts, result) => {
+        statusCounts[result.status] = (statusCounts[result.status] || 0) + 1
+        statusCounts.issues += result.issues?.length || 0
+        return statusCounts
+      },
+      { pass: 0, warn: 0, fail: 0, issues: 0 },
     )
 
-    let overallStatus = 'pass'
-    if (failed > 0) {
-      overallStatus = 'fail'
-    } else if (warned > 0) {
-      overallStatus = 'warn'
-    }
+    const overallStatus = counts.fail > 0 ? 'fail' : counts.warn > 0 ? 'warn' : 'pass'
 
     return {
-      totalAgents,
-      passed,
-      warned,
-      failed,
-      totalIssues,
+      totalAgents: results.length,
+      passed: counts.pass,
+      warned: counts.warn,
+      failed: counts.fail,
+      totalIssues: counts.issues,
       overallStatus,
       results,
     }
@@ -164,12 +173,14 @@ export class Orchestrator {
    * Run a single iteration of the review loop
    *
    * @param {Array} files - Files to review
-   * @param {number} iteration - Current iteration number
-   * @param {number} maxIterations - Maximum iterations
-   * @param {boolean} parallel - Run agents in parallel
+   * @param {Object} options - Iteration options
+   * @param {number} options.iteration - Current iteration number
+   * @param {number} options.maxIterations - Maximum iterations
+   * @param {boolean} [options.parallel] - Run agents in parallel
    * @returns {Promise<Object>} Iteration result with results and shouldContinue flag
    */
-  async runSingleIteration(files, iteration, maxIterations, parallel) {
+  async runSingleIteration(files, options = {}) {
+    const { iteration, maxIterations, parallel = false } = options
     this.reportProgress(`Loop iteration ${iteration}/${maxIterations}`)
 
     const results = parallel
@@ -183,7 +194,7 @@ export class Orchestrator {
 
     this.reportProgress(`Issues found, continuing loop...`, {
       iteration,
-      issues: results.reduce((sum, r) => sum + (r.issues?.length || 0), 0),
+      issues: results.reduce((sum, result) => sum + (result.issues?.length || 0), 0),
     })
 
     return { results, shouldContinue: true }
@@ -209,12 +220,11 @@ export class Orchestrator {
 
     while (iteration < maxIterations) {
       iteration++
-      const iterationResult = await this.runSingleIteration(
-        files,
+      const iterationResult = await this.runSingleIteration(files, {
         iteration,
         maxIterations,
         parallel,
-      )
+      })
       results = iterationResult.results
 
       if (!iterationResult.shouldContinue) {

@@ -6,6 +6,8 @@ const SEVERITY_TO_PRIORITY = {
   suggestion: 'low',
 }
 
+const DEFAULT_PRIORITY = 'medium'
+
 const PRIORITY_SORT_ORDER = { high: 0, medium: 1, low: 2 }
 
 const PRIORITY_LABELS = {
@@ -22,7 +24,7 @@ const PRIORITY_LABELS = {
  * @returns {Object} CorrectionPrompt
  */
 export function issueToPrompt(issue, category) {
-  const priority = SEVERITY_TO_PRIORITY[issue.severity] || 'medium'
+  const priority = SEVERITY_TO_PRIORITY[issue.severity] || DEFAULT_PRIORITY
 
   let instruction = `Fix: ${issue.message}`
   if (issue.suggestedFix) {
@@ -99,7 +101,7 @@ export function formatFilePrompts(file, filePrompts) {
   let output = `## ${file}\n\n`
 
   for (const prompt of filePrompts) {
-    const priorityLabel = PRIORITY_LABELS[prompt.priority] || '[MEDIUM]'
+    const priorityLabel = PRIORITY_LABELS[prompt.priority] || PRIORITY_LABELS[DEFAULT_PRIORITY]
     output += `- ${priorityLabel} ${prompt.instruction}\n`
     if (prompt.context) {
       output += `  - Context: ${prompt.context}\n`

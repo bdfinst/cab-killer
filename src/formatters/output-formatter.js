@@ -1,3 +1,5 @@
+const REPORT_WIDTH = 60
+
 /**
  * Get status emoji for a given status and format
  * @param {string} status - 'pass', 'warn', or 'fail'
@@ -28,9 +30,9 @@ function formatIssueDetails(issues) {
  */
 export function formatConsoleOutput(aggregated, verbose) {
   let output = '\n'
-  output += '═'.repeat(60) + '\n'
+  output += '═'.repeat(REPORT_WIDTH) + '\n'
   output += '  CODE REVIEW RESULTS\n'
-  output += '═'.repeat(60) + '\n\n'
+  output += '═'.repeat(REPORT_WIDTH) + '\n\n'
 
   const statusEmoji = getStatusEmoji(aggregated.overallStatus, 'console')
 
@@ -51,7 +53,7 @@ export function formatConsoleOutput(aggregated, verbose) {
     }
   }
 
-  output += '\n' + '═'.repeat(60) + '\n'
+  output += '\n' + '═'.repeat(REPORT_WIDTH) + '\n'
   return output
 }
 

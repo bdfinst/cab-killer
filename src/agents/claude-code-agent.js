@@ -1,77 +1,39 @@
 import { BaseReviewAgent } from './base-agent.js'
-import { spawn } from 'node:child_process'
 import { extractJsonFromResponse } from '../utils/json-extractor.js'
 
 /**
- * Review agent that uses Claude Code CLI instead of API
+ * Review agent that uses Claude Agent SDK for code review
  */
 export class ClaudeCodeAgent extends BaseReviewAgent {
   /**
    * @param {string} name - Agent name
    * @param {PromptLoader} promptLoader - Prompt loader instance
+   * @param {SDKClient} [sdkClient] - SDK client instance (required for review)
    */
-  constructor(name, promptLoader) {
+  constructor(name, promptLoader, sdkClient = null) {
     super(name)
     this.promptLoader = promptLoader
+    this.sdkClient = sdkClient
     this.prompt = null
   }
 
   /**
-   * Review files using Claude Code CLI
+   * Review files using Claude Agent SDK
    *
    * @param {Array<{path: string, content: string}>} files - Files to review
    * @returns {Promise<Object>} ReviewResult
    */
   async review(files) {
+    if (!this.sdkClient) {
+      throw new Error('SDKClient is required for review operations')
+    }
+
     const prompt = await this.buildPrompt(files)
-    const response = await this.callClaudeCode(prompt)
-    return this.parseResponse(response)
-  }
-
-  /**
-   * Call Claude Code CLI with prompt
-   *
-   * @param {string} prompt - The prompt to send
-   * @returns {Promise<string>} Response text
-   */
-  async callClaudeCode(prompt) {
-    return new Promise((resolve, reject) => {
-      // Use --print for non-interactive mode, pipe prompt via stdin
-      // Use --model sonnet for faster, cheaper reviews
-      const claude = spawn('claude', ['--print', '--model', 'sonnet'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
-      })
-
-      let stdout = ''
-      let stderr = ''
-
-      claude.stdout.on('data', (data) => {
-        stdout += data.toString()
-      })
-
-      claude.stderr.on('data', (data) => {
-        stderr += data.toString()
-      })
-
-      claude.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout)
-        } else {
-          reject(
-            new Error(`Claude Code failed (code ${code}): ${stderr || stdout}`),
-          )
-        }
-      })
-
-      claude.on('error', (err) => {
-        reject(new Error(`Failed to spawn Claude Code: ${err.message}`))
-      })
-
-      // Write prompt to stdin and close
-      claude.stdin.write(prompt)
-      claude.stdin.end()
+    const { result } = await this.sdkClient.chat(prompt, {
+      allowedTools: ['Read', 'Glob', 'Grep'],
+      permissionMode: 'bypassPermissions',
     })
+    return this.parseResponse(result)
   }
 
   /**

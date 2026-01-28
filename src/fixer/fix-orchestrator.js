@@ -1,36 +1,54 @@
 import { readFile, readdir, mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
-import { spawn } from 'node:child_process'
 import {
   loadRepositoryRules,
   formatRulesForPrompt,
 } from '../utils/repo-rules-loader.js'
 import { runTests, runBuild, runLint } from '../utils/test-runner.js'
 import { TokenTracker } from '../utils/token-tracker.js'
+import { SDKClient } from '../sdk/index.js'
+
+const MAX_ERROR_MESSAGE_LENGTH = 200
+const MAX_REPORT_INSTRUCTION_LENGTH = 100
+const DEFAULT_MAX_BUDGET_USD = 10.0 // USD
 
 /**
- * Orchestrates applying fixes using independent Claude agents
+ * Orchestrates applying fixes using Claude Agent SDK
  */
 export class FixOrchestrator {
   constructor(options = {}) {
-    this.dryRun = options.dryRun || false
-    this.verbose = options.verbose || false
-    this.showProgress = options.showProgress !== false
+    // Validation flags
     this.runTests = options.runTests !== false
     this.runBuild = options.runBuild !== false
     this.runLint = options.runLint !== false
+
+    // Display flags
+    this.verbose = options.verbose || false
+    this.showProgress = options.showProgress !== false
+    this.dryRun = options.dryRun || false
+
+    // Paths and reporter
     this.repoPath = options.repoPath || process.cwd()
     this.reporter = options.reporter || {
       log: (msg) => console.log(msg),
       write: (msg) => process.stdout.write(msg),
     }
-    this.repoRules = null
+
+    // Internal state
+    this.repoRulesPromptText = null
+    this.startTime = null
     this.tokenTracker = new TokenTracker({
+      maxBudget: options.maxBudget || DEFAULT_MAX_BUDGET_USD,
       maxTokens: 200000,
       verbose: this.verbose,
       reporter: this.reporter,
     })
-    this.startTime = null
+
+    // SDK client
+    this.sdkClient = options.sdkClient || new SDKClient({
+      model: options.model || 'claude-sonnet-4-5',
+      workingDirectory: this.repoPath,
+    })
   }
 
   log(message) {
@@ -50,29 +68,17 @@ export class FixOrchestrator {
       return 'No output received from Claude agent'
     }
 
-    // Look for common error patterns
-    const errorPatterns = [
-      /error:\s*(.+)/i,
-      /failed:\s*(.+)/i,
-      /cannot\s+(.+)/i,
-      /unable to\s+(.+)/i,
-      /permission denied/i,
-      /file not found/i,
-      /no such file/i,
-    ]
-
-    for (const pattern of errorPatterns) {
-      const match = output.match(pattern)
-      if (match) {
-        return match[0].slice(0, 200)
-      }
+    // Combined pattern for common errors
+    const errorPattern = /error:\s*.+|failed:\s*.+|cannot\s+.+|unable to\s+.+|permission denied|file not found|no such file/i
+    const match = output.match(errorPattern)
+    if (match) {
+      return match[0].slice(0, MAX_ERROR_MESSAGE_LENGTH)
     }
 
-    // If no pattern matched, return first meaningful line (up to 200 chars)
-    const lines = output.trim().split('\n').filter((l) => l.trim())
-    if (lines.length > 0) {
-      const firstLine = lines[0].trim()
-      return firstLine.length > 200 ? firstLine.slice(0, 197) + '...' : firstLine
+    // Fallback: first meaningful line
+    const firstLine = output.trim().split('\n').find((l) => l.trim())
+    if (firstLine) {
+      return firstLine.length > MAX_ERROR_MESSAGE_LENGTH ? firstLine.slice(0, MAX_ERROR_MESSAGE_LENGTH - 3) + '...' : firstLine
     }
 
     return 'Unknown error'
@@ -118,9 +124,9 @@ export class FixOrchestrator {
    * @returns {Promise<void>}
    */
   async loadRepoRules() {
-    if (!this.repoRules) {
+    if (!this.repoRulesPromptText) {
       const rules = await loadRepositoryRules(this.repoPath)
-      this.repoRules = formatRulesForPrompt(rules)
+      this.repoRulesPromptText = formatRulesForPrompt(rules)
       if (this.verbose && rules.length > 0) {
         this.reporter.log(
           `Loaded ${rules.length} repository rules file(s): ${rules.map((r) => r.filename).join(', ')}`,
@@ -142,8 +148,8 @@ export class FixOrchestrator {
 **Location:** ${prompt.context}
 **Files:** ${prompt.affectedFiles.join(', ')}`
 
-    if (this.repoRules) {
-      fixPrompt += `\n${this.repoRules}`
+    if (this.repoRulesPromptText) {
+      fixPrompt += `\n${this.repoRulesPromptText}`
     }
 
     fixPrompt += `
@@ -156,10 +162,19 @@ Instructions:
 
 Apply the fix now.`
 
-    // Track token usage for the prompt
-    this.tokenTracker.addText(fixPrompt)
-
+    // Note: Token usage is now tracked via SDK usage stats in spawnAgent
     return fixPrompt
+  }
+
+  /**
+   * Validation step definitions
+   */
+  getValidationSteps() {
+    return [
+      { name: 'lint', enabled: this.runLint, runner: runLint, timeout: 60000 },
+      { name: 'build', enabled: this.runBuild, runner: runBuild, timeout: 120000 },
+      { name: 'tests', enabled: this.runTests, runner: runTests, timeout: 180000 },
+    ]
   }
 
   /**
@@ -168,41 +183,20 @@ Apply the fix now.`
    * @returns {Promise<{success: boolean, output: string, failedStep: string|null}>}
    */
   async runValidation() {
-    const results = {
-      success: true,
-      output: '',
-      failedStep: null,
-    }
+    const results = { success: true, output: '', failedStep: null }
 
-    if (this.runLint) {
-      this.log('  Running lint...')
-      const lintResult = await runLint(this.repoPath, { timeout: 60000 })
-      results.output += `\nLint: ${lintResult.success ? 'PASS' : 'FAIL'}\n${lintResult.output}`
-      if (!lintResult.success) {
-        results.success = false
-        results.failedStep = 'lint'
-        return results
+    for (const step of this.getValidationSteps()) {
+      if (!step.enabled) {
+        continue
       }
-    }
 
-    if (this.runBuild) {
-      this.log('  Running build...')
-      const buildResult = await runBuild(this.repoPath, { timeout: 120000 })
-      results.output += `\nBuild: ${buildResult.success ? 'PASS' : 'FAIL'}\n${buildResult.output}`
-      if (!buildResult.success) {
-        results.success = false
-        results.failedStep = 'build'
-        return results
-      }
-    }
+      this.log(`  Running ${step.name}...`)
+      const stepResult = await step.runner(this.repoPath, { timeout: step.timeout })
+      results.output += `\n${step.name}: ${stepResult.success ? 'PASS' : 'FAIL'}\n${stepResult.output}`
 
-    if (this.runTests) {
-      this.log('  Running tests...')
-      const testResult = await runTests(this.repoPath, { timeout: 180000 })
-      results.output += `\nTests: ${testResult.success ? 'PASS' : 'FAIL'}\n${testResult.output}`
-      if (!testResult.success) {
+      if (!stepResult.success) {
         results.success = false
-        results.failedStep = 'tests'
+        results.failedStep = step.name
         return results
       }
     }
@@ -211,7 +205,7 @@ Apply the fix now.`
   }
 
   /**
-   * Spawn an independent Claude agent to apply a fix
+   * Apply a fix using Claude Agent SDK
    *
    * @param {Object} prompt - CorrectionPrompt object
    * @returns {Promise<{success: boolean, output: string, validationFailed: boolean}>}
@@ -224,74 +218,37 @@ Apply the fix now.`
       return { success: true, output: '[dry-run]', validationFailed: false }
     }
 
-    return new Promise((resolve) => {
-      // Use claude without --print so it can make file edits
-      // Pass prompt via -p flag for non-interactive mode
-      // Use --model sonnet for faster, cheaper fixes
-      const claude = spawn(
-        'claude',
-        [
-          '-p',
-          fixPrompt,
-          '--model',
-          'sonnet',
-          '--allowedTools',
-          'Read,Edit,Write',
-        ],
-        {
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: { ...process.env },
-          cwd: this.repoPath,
-        },
-      )
-
-      let stdout = ''
-      let stderr = ''
-
-      claude.stdout.on('data', (data) => {
-        const text = data.toString()
-        stdout += text
-        if (this.verbose) {
-          this.reporter.write(text)
-        }
+    try {
+      const { result = '', usage } = await this.sdkClient.chat(fixPrompt, {
+        allowedTools: ['Read', 'Edit', 'Write', 'Glob', 'Grep'],
+        permissionMode: 'acceptEdits',
       })
 
-      claude.stderr.on('data', (data) => {
-        stderr += data.toString()
-      })
+      // Track usage from SDK
+      if (usage) {
+        this.tokenTracker.addUsage(usage)
+      }
 
-      claude.on('close', async (code) => {
-        // Track response tokens
-        this.tokenTracker.addText(stdout)
+      if (this.verbose && result) {
+        this.reporter.log(result)
+      }
 
-        if (code !== 0) {
-          resolve({
-            success: false,
-            output: stderr || stdout,
-            validationFailed: false,
-          })
-          return
-        }
+      // Fix was applied, now run validation
+      const validation = await this.runValidation()
 
-        // Fix was applied, now run validation
-        const validation = await this.runValidation()
-
-        resolve({
-          success: validation.success,
-          output: stdout + validation.output,
-          validationFailed: !validation.success,
-          failedStep: validation.failedStep,
-        })
-      })
-
-      claude.on('error', (err) => {
-        resolve({
-          success: false,
-          output: `Failed to spawn Claude: ${err.message}`,
-          validationFailed: false,
-        })
-      })
-    })
+      return {
+        success: validation.success,
+        output: (result || '') + validation.output,
+        validationFailed: !validation.success,
+        failedStep: validation.failedStep,
+      }
+    } catch (err) {
+      return {
+        success: false,
+        output: `SDK error: ${err.message}`,
+        validationFailed: false,
+      }
+    }
   }
 
   /**
@@ -343,24 +300,86 @@ Apply the fix now.`
   }
 
   /**
+   * Process a single prompt and categorize the result
+   *
+   * @param {string} file - Prompt filename
+   * @param {Object} prompt - Prompt object
+   * @param {string} promptsDir - Base prompts directory
+   * @returns {Promise<{status: 'applied'|'validationFailed'|'failed', item: Object}>}
+   */
+  async processPrompt(file, prompt, promptsDir) {
+    // Log prompt details (moved from applyFixes loop)
+    this.reporter.log(`  Priority: ${prompt.priority}`)
+    this.reporter.log(`  Category: ${prompt.category}`)
+    this.reporter.log(`  Files: ${prompt.affectedFiles.join(', ')}`)
+
+    const baseItem = {
+      file,
+      category: prompt.category,
+      instruction: prompt.instruction,
+      affectedFiles: prompt.affectedFiles,
+    }
+
+    const result = await this.spawnAgent(prompt)
+
+    if (result.success) {
+      this.reporter.log(`  Status: Applied & Validated`)
+      if (!this.dryRun) {
+        await this.markComplete(promptsDir, file)
+      }
+      return { status: 'applied', item: baseItem }
+    }
+
+    const errorMsg = this.extractErrorMessage(result.output)
+
+    if (result.validationFailed) {
+      this.reporter.log(`  Status: Applied but validation failed`)
+      this.reporter.log(`  Failed step: ${result.failedStep}`)
+      this.reporter.log(`  Details: ${errorMsg}`)
+      return {
+        status: 'validationFailed',
+        item: { ...baseItem, failedStep: result.failedStep, reason: errorMsg },
+      }
+    }
+
+    this.reporter.log(`  Status: Failed`)
+    this.reporter.log(`  Reason: ${errorMsg}`)
+    return { status: 'failed', item: { ...baseItem, reason: errorMsg } }
+  }
+
+  /**
+   * Build final results object from categorized items
+   *
+   * @param {number} total - Total prompts processed
+   * @param {Object} results - Categorized results
+   * @returns {Object} Final results summary
+   */
+  _buildApplyFixesResult(total, results) {
+    return {
+      total,
+      applied: results.applied.length,
+      failed: results.failed.length,
+      validationFailed: results.validationFailed.length,
+      appliedItems: results.applied,
+      failedItems: results.failed,
+      validationFailedItems: results.validationFailed,
+      tokenUsage: this.tokenTracker.getSummary(),
+      duration: Date.now() - this.startTime,
+    }
+  }
+
+  /**
    * Apply all fixes from a prompts directory
    *
    * @param {string} promptsDir - Directory containing prompt JSON files
-   * @returns {Promise<{total: number, applied: number, failed: number, validationFailed: number, appliedItems: Array, failedItems: Array, validationFailedItems: Array, tokenUsage: Object, duration: number}>}
+   * @returns {Promise<Object>} Results summary
    */
   async applyFixes(promptsDir) {
     this.startTime = Date.now()
-
-    // Load repository rules once at the start
     await this.loadRepoRules()
 
     const prompts = await this.loadPrompts(promptsDir)
-    let applied = 0
-    let failed = 0
-    let validationFailed = 0
-    const appliedItems = []
-    const failedItems = []
-    const validationFailedItems = []
+    const results = { applied: [], validationFailed: [], failed: [] }
 
     this.reporter.log(`Found ${prompts.length} prompts in ${promptsDir}`)
     if (this.showProgress) {
@@ -372,69 +391,55 @@ Apply the fix now.`
     for (let i = 0; i < prompts.length; i++) {
       const { file, prompt } = prompts[i]
       this.reporter.log(`\n[${i + 1}/${prompts.length}] ${file}`)
-      this.reporter.log(`  Priority: ${prompt.priority}`)
-      this.reporter.log(`  Category: ${prompt.category}`)
-      this.reporter.log(`  Files: ${prompt.affectedFiles.join(', ')}`)
 
-      const result = await this.spawnAgent(prompt)
+      const { status, item } = await this.processPrompt(file, prompt, promptsDir)
+      results[status].push(item)
 
-      if (result.success) {
-        applied++
-        this.reporter.log(`  Status: Applied & Validated`)
-        appliedItems.push({
-          file,
-          category: prompt.category,
-          instruction: prompt.instruction,
-          affectedFiles: prompt.affectedFiles,
-        })
-        if (!this.dryRun) {
-          await this.markComplete(promptsDir, file)
-        }
-      } else if (result.validationFailed) {
-        validationFailed++
-        this.reporter.log(`  Status: Applied but validation failed`)
-        this.reporter.log(`  Failed step: ${result.failedStep}`)
-        const errorMsg = this.extractErrorMessage(result.output)
-        this.reporter.log(`  Details: ${errorMsg}`)
-        validationFailedItems.push({
-          file,
-          category: prompt.category,
-          instruction: prompt.instruction,
-          affectedFiles: prompt.affectedFiles,
-          failedStep: result.failedStep,
-          reason: errorMsg,
-        })
-      } else {
-        failed++
-        const errorMsg = this.extractErrorMessage(result.output)
-        this.reporter.log(`  Status: Failed`)
-        this.reporter.log(`  Reason: ${errorMsg}`)
-        failedItems.push({
-          file,
-          category: prompt.category,
-          instruction: prompt.instruction,
-          affectedFiles: prompt.affectedFiles,
-          reason: errorMsg,
-        })
-      }
-
-      // Show progress after each fix
       this.displayProgress(i + 1, prompts.length)
     }
 
-    const duration = Date.now() - this.startTime
+    return this._buildApplyFixesResult(prompts.length, results)
+  }
 
-    return {
-      total: prompts.length,
-      applied,
-      failed,
-      validationFailed,
-      appliedItems,
-      failedItems,
-      validationFailedItems,
-      tokenUsage: this.tokenTracker.getSummary(),
-      duration,
+  /**
+   * Format a single report item
+   *
+   * @param {Object} item - Item to format
+   * @param {string[]} extraFields - Additional fields to include
+   * @returns {string} Formatted item
+   */
+  formatReportItem(item, extraFields = []) {
+    const instruction = item.instruction.length > MAX_REPORT_INSTRUCTION_LENGTH
+      ? item.instruction.slice(0, MAX_REPORT_INSTRUCTION_LENGTH) + '...'
+      : item.instruction
+
+    let text = `[${item.category}] ${item.file}\n`
+    text += `  ${instruction}\n`
+    text += `  Files: ${item.affectedFiles.join(', ')}\n`
+
+    for (const field of extraFields) {
+      if (item[field]) {
+        const label = field.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
+        text += `  ${label}: ${item[field]}\n`
+      }
     }
+
+    return text + '\n'
+  }
+
+  /**
+   * Format a report section
+   *
+   * @param {string} title - Section title
+   * @param {Array} items - Items to include
+   * @param {string[]} extraFields - Additional fields per item
+   * @returns {string} Formatted section or empty string
+   */
+  formatReportSection(title, items, extraFields = []) {
+    if (!items || items.length === 0) {
+      return ''
+    }
+    return `--- ${title} ---\n\n` + items.map((item) => this.formatReportItem(item, extraFields)).join('')
   }
 
   /**
@@ -444,9 +449,8 @@ Apply the fix now.`
    * @returns {string} Formatted summary report
    */
   generateReport(result) {
-    let report = '\n' + '='.repeat(60) + '\n'
-    report += '  FIX SUMMARY REPORT\n'
-    report += '='.repeat(60) + '\n\n'
+    const divider = '='.repeat(60)
+    let report = `\n${divider}\n  FIX SUMMARY REPORT\n${divider}\n\n`
 
     report += `Total: ${result.total} | Applied: ${result.applied} | Failed: ${result.failed}`
     if (result.validationFailed > 0) {
@@ -454,7 +458,6 @@ Apply the fix now.`
     }
     report += '\n'
 
-    // Add duration and token usage
     if (result.duration) {
       report += `Duration: ${this.formatElapsedTime(result.duration)}\n`
     }
@@ -462,40 +465,22 @@ Apply the fix now.`
       report += `Token Usage: ${result.tokenUsage.current.toLocaleString()}/${result.tokenUsage.max.toLocaleString()} `
       report += `(${result.tokenUsage.percentage.toFixed(1)}%)\n`
     }
+
+    // Add SDK comparison section if SDK data available
+    if (result.tokenUsage && result.tokenUsage.inputTokens > 0) {
+      report += `SDK Comparison:\n`
+      report += `  Estimated tokens: ${result.tokenUsage.current.toLocaleString()}\n`
+      report += `  Actual tokens: ${(result.tokenUsage.inputTokens + result.tokenUsage.outputTokens).toLocaleString()}\n`
+      report += `  Actual cost: $${result.tokenUsage.costUsd.toFixed(4)}\n`
+    }
+
     report += '\n'
 
-    if (result.appliedItems.length > 0) {
-      report += '--- APPLIED & VALIDATED ---\n\n'
-      for (const item of result.appliedItems) {
-        report += `[${item.category}] ${item.file}\n`
-        report += `  ${item.instruction.slice(0, 100)}${item.instruction.length > 100 ? '...' : ''}\n`
-        report += `  Files: ${item.affectedFiles.join(', ')}\n\n`
-      }
-    }
+    report += this.formatReportSection('APPLIED & VALIDATED', result.appliedItems)
+    report += this.formatReportSection('VALIDATION FAILED', result.validationFailedItems, ['failedStep', 'reason'])
+    report += this.formatReportSection('FAILED', result.failedItems, ['reason'])
 
-    if (result.validationFailedItems && result.validationFailedItems.length > 0) {
-      report += '--- VALIDATION FAILED ---\n\n'
-      for (const item of result.validationFailedItems) {
-        report += `[${item.category}] ${item.file}\n`
-        report += `  ${item.instruction.slice(0, 100)}${item.instruction.length > 100 ? '...' : ''}\n`
-        report += `  Files: ${item.affectedFiles.join(', ')}\n`
-        report += `  Failed step: ${item.failedStep}\n`
-        report += `  Reason: ${item.reason}\n\n`
-      }
-    }
-
-    if (result.failedItems.length > 0) {
-      report += '--- FAILED ---\n\n'
-      for (const item of result.failedItems) {
-        report += `[${item.category}] ${item.file}\n`
-        report += `  ${item.instruction.slice(0, 100)}${item.instruction.length > 100 ? '...' : ''}\n`
-        report += `  Files: ${item.affectedFiles.join(', ')}\n`
-        report += `  Reason: ${item.reason}\n\n`
-      }
-    }
-
-    report += '='.repeat(60) + '\n'
-
+    report += divider + '\n'
     return report
   }
 }

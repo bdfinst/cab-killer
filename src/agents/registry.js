@@ -80,16 +80,17 @@ export class AgentRegistry {
  *
  * @param {Object} [options]
  * @param {string} [options.promptsDir] - Directory containing prompts
+ * @param {SDKClient} [options.sdkClient] - SDK client to inject into agents
  * @returns {AgentRegistry}
  */
 export function createAgentRegistry(options = {}) {
-  const { promptsDir = DEFAULT_PROMPTS_DIR } = options
+  const { promptsDir = DEFAULT_PROMPTS_DIR, sdkClient = null } = options
 
   const registry = new AgentRegistry()
   const loader = new PromptLoader(promptsDir)
 
   for (const agentName of DEFAULT_AGENTS) {
-    const agent = new ClaudeCodeAgent(agentName, loader)
+    const agent = new ClaudeCodeAgent(agentName, loader, sdkClient)
     registry.register(agent)
   }
 

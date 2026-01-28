@@ -1,3 +1,9 @@
+// Rough approximation: average English text uses ~4 characters per token
+const CHARS_PER_TOKEN = 4
+
+// Ratio of content to keep from each end when truncating (40% start + 40% end)
+const TRUNCATE_KEEP_RATIO = 0.4
+
 /**
  * Estimate token count from text
  * Uses rough approximation of ~4 characters per token
@@ -9,7 +15,7 @@ export function estimateTokens(text) {
   if (!text) {
     return 0
   }
-  return Math.ceil(text.length / 4)
+  return Math.ceil(text.length / CHARS_PER_TOKEN)
 }
 
 /**
@@ -67,8 +73,8 @@ export function truncateContent(content, tokenLimit) {
   }
 
   // Keep ~40% from start, ~40% from end, truncate middle
-  const maxChars = tokenLimit * 4
-  const keepChars = Math.floor(maxChars * 0.4)
+  const maxChars = tokenLimit * CHARS_PER_TOKEN
+  const keepChars = Math.floor(maxChars * TRUNCATE_KEEP_RATIO)
   const truncateMsg = '\n\n... [truncated] ...\n\n'
 
   const start = content.slice(0, keepChars)

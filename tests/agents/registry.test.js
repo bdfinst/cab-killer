@@ -72,6 +72,19 @@ describe('AgentRegistry', () => {
   })
 })
 
+// Mock SDK client for testing
+const createMockSdkClient = () => ({
+  chat: async () => ({
+    result: JSON.stringify({
+      status: 'pass',
+      issues: [],
+      summary: 'Mock review complete',
+    }),
+    usage: { inputTokens: 100, outputTokens: 50, costUsd: 0.001 },
+  }),
+  getUsage: () => ({ inputTokens: 0, outputTokens: 0, costUsd: 0 }),
+})
+
 describe('createAgentRegistry', () => {
   it('should create a registry with default agents', () => {
     const registry = createAgentRegistry()
@@ -86,7 +99,8 @@ describe('createAgentRegistry', () => {
   })
 
   it('should create agents that can perform reviews', async () => {
-    const registry = createAgentRegistry()
+    const mockSdkClient = createMockSdkClient()
+    const registry = createAgentRegistry({ sdkClient: mockSdkClient })
     const agent = registry.get('complexity-review')
 
     // Provide a simple code sample for the agent to review
