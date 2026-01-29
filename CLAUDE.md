@@ -13,6 +13,8 @@ This system provides automated code review through specialized agents:
 - **Complexity Review Agent**: Measures and flags excessive code complexity
 - **Claude Setup Review Agent**: Reviews CLAUDE.md content, structure, rules, and skill definitions
 - **Token Efficiency Review Agent**: Optimizes Claude configuration and code for minimal token usage
+- **Security Review Agent**: Identifies security vulnerabilities and insecure coding practices
+- **FP Review Agent**: Detects mutations and impure patterns in functional code
 
 An **Orchestrator** coordinates these agents and can:
 
@@ -50,7 +52,9 @@ src/
 │   ├── domain-review.js
 │   ├── complexity-review.js
 │   ├── claude-setup-review.js
-│   └── token-efficiency-review.js
+│   ├── token-efficiency-review.js
+│   ├── security-review.js
+│   └── fp-review.js
 ├── orchestrator/        # Orchestration logic
 │   ├── orchestrator.js  # Main orchestrator
 │   ├── modes.js         # Execution modes (single/all/loop)
@@ -163,6 +167,12 @@ Create `config/review-config.json`:
       "maxClaudeMdLength": 5000,
       "maxFileLength": 500,
       "maxFunctionLength": 50
+    },
+    "security-review": { "enabled": true },
+    "fp-review": {
+      "enabled": true,
+      "allowedMutablePrefixes": ["mut", "mutable", "_"],
+      "strictMode": true
     }
   },
   "orchestrator": {
@@ -280,6 +290,95 @@ The Token Efficiency Review Agent optimizes Claude configuration and code struct
 - Suggests moving detailed docs to external .md files
 
 This agent helps reduce API costs by ensuring that only essential context is loaded into Claude's prompt, while maintaining code quality and documentation clarity.
+
+## Security Review Agent Details
+
+The Security Review Agent identifies security vulnerabilities and insecure coding practices:
+
+**Injection vulnerability detection:**
+
+- SQL injection via unsanitized query parameters
+- Command injection in shell executions
+- Cross-site scripting (XSS) in rendered output
+- Template injection vulnerabilities
+- Path traversal in file operations
+
+**Authentication & authorization checks:**
+
+- Weak password hashing algorithms
+- Insecure session management
+- Missing authorization checks on protected resources
+- JWT validation issues (algorithm confusion, expiration)
+- Brute force attack protection
+
+**Sensitive data exposure:**
+
+- Hardcoded secrets, API keys, or credentials
+- Sensitive data in logs or error messages
+- Unencrypted sensitive data storage
+- PII handling violations
+
+**Security configuration:**
+
+- Missing security headers (CSP, HSTS, X-Frame-Options)
+- Overly permissive CORS configuration
+- Debug features enabled in production
+- Default credentials
+
+**Cryptography issues:**
+
+- Use of deprecated algorithms (MD5, SHA1 for security)
+- Insecure random number generation
+- Improper key management
+
+**Input validation:**
+
+- Missing server-side validation
+- Unsafe file upload handling
+- Insecure deserialization
+- Open redirect vulnerabilities
+
+## FP Review Agent Details
+
+The FP Review Agent detects mutations and impure patterns in code that should follow functional programming principles:
+
+**Variable declaration checks:**
+
+- Flags `let` declarations where the variable is never reassigned (should be `const`)
+- Allows variables with mutable prefixes (mut, mutable, _) to remain mutable
+- Detects increment/decrement operators on non-loop counter variables
+
+**Array mutation detection:**
+
+- `.push()` - suggests spread: `[...arr, item]`
+- `.pop()` - suggests slice: `arr.slice(0, -1)`
+- `.shift()` - suggests slice: `arr.slice(1)`
+- `.unshift()` - suggests spread: `[item, ...arr]`
+- `.splice()` - suggests slice and spread combination
+- `.reverse()` - suggests `[...arr].reverse()` or `toReversed()`
+- `.sort()` - suggests `[...arr].sort()` or `toSorted()`
+- `.fill()` and `.copyWithin()` - suggests map or new array creation
+- Allows mutations on spread copies: `[...arr].sort()`
+
+**Object/parameter mutation detection:**
+
+- Property assignment on function parameters: `param.prop = value`
+- Bracket assignment on parameters: `param[key] = value`
+- `delete` on parameter properties
+- `Object.assign(existingObj, ...)` - suggests spread or new object target
+- Allows `this.property` assignments in class methods
+
+**Global state mutation detection:**
+
+- Mutations to `window.*`
+- Mutations to `global.*`
+- Mutations to `globalThis.*`
+- Mutations to `process.env.*`
+
+**Configuration options:**
+
+- `allowedMutablePrefixes`: Variable name prefixes that indicate intentional mutability (default: `["mut", "mutable", "_"]`)
+- `strictMode`: When enabled, applies stricter FP rules (default: `true`)
 
 ## Coding Conventions
 

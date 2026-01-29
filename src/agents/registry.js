@@ -15,6 +15,8 @@ const DEFAULT_AGENTS = [
   'complexity-review',
   'claude-setup-review',
   'token-efficiency-review',
+  'security-review',
+  'fp-review',
 ]
 
 /**
