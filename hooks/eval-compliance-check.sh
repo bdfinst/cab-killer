@@ -16,8 +16,8 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # Only check agent and skill files
 case "$FILE_PATH" in
-  */.claude/agents/*.md) FILE_TYPE="agent" ;;
-  */.claude/skills/*/SKILL.md) FILE_TYPE="skill" ;;
+  */agents/*.md) FILE_TYPE="agent" ;;
+  */skills/*/SKILL.md) FILE_TYPE="skill" ;;
   *) exit 0 ;;
 esac
 

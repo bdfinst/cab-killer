@@ -35,7 +35,7 @@ Optional:
 
 ### 1. Load agent definition
 
-Read `.claude/agents/<name>.md`. If the file doesn't exist, list available agents from `.claude/agents/` and ask the user to pick one.
+Read `agents/<name>.md`. If the file doesn't exist, list available agents from `agents/` and ask the user to pick one.
 
 ### 2. Determine target files
 

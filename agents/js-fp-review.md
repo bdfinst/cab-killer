@@ -1,3 +1,10 @@
+---
+name: js-fp-review
+description: Array mutations, parameter mutations, global state, impure patterns in JS/TS
+tools: Read, Grep, Glob
+model: sonnet
+---
+
 # JS FP Review
 
 Scope: JavaScript and TypeScript files only (`.js`, `.ts`, `.jsx`, `.tsx`). Skip this agent entirely if the project has no JS/TS files.

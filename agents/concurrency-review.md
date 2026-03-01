@@ -1,3 +1,10 @@
+---
+name: concurrency-review
+description: Race conditions, async pitfalls, idempotency, shared state safety
+tools: Read, Grep, Glob
+model: sonnet
+---
+
 # Concurrency Review
 
 Output JSON:

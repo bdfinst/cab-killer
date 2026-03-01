@@ -78,7 +78,7 @@ If a tool is not available (e.g., no eslint, no tsconfig, no gh), skip that gate
 
 ### 3. Determine enabled agents
 
-List all agent files in `.claude/agents/*.md`. All agents are enabled by default.
+List all agent files in `agents/*.md`. All agents are enabled by default.
 
 If a `review-config.json` exists in the project root, read it. It can disable specific agents (`"enabled": false`). This file is optional and project-local — it is not part of the toolkit.
 

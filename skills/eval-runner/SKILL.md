@@ -32,21 +32,13 @@ Arguments: $ARGUMENTS
 
 ## Steps
 
-### 1. Resolve toolkit root
+### 1. Resolve eval corpus
 
-The eval corpus lives in the toolkit repo, not the installed project. Resolve it:
-
-```
-# If .claude/skills is a symlink, follow it to the toolkit
-TOOLKIT_ROOT=$(readlink .claude/skills)/../../..
-# If not a symlink (running from toolkit repo itself), use cwd
-```
-
-Verify `$TOOLKIT_ROOT/evals/fixtures/` exists. If not, error: "Cannot find eval fixtures. Are you in the toolkit repo or an installed project?"
+Verify `evals/fixtures/` exists in the plugin root. If not, error: "Cannot find eval fixtures. Are you in the cab-killer plugin directory?"
 
 ### 2. Load fixtures and expected results
 
-Read all files from `$TOOLKIT_ROOT/evals/fixtures/` and corresponding JSON from `$TOOLKIT_ROOT/evals/expected/`.
+Read all files from `evals/fixtures/` and corresponding JSON from `evals/expected/`.
 
 For each fixture:
 - Match the fixture stem (filename without extension) to its expected JSON
@@ -98,11 +90,11 @@ If `--trials` > 1:
 
 ### 6. Detect eval saturation
 
-Track the last 3 runs in `$TOOLKIT_ROOT/evals/transcripts/`. If the last 3 consecutive runs for an agent produce identical grades, flag as "saturated" — the expected ranges may need tightening.
+Track the last 3 runs in `evals/transcripts/`. If the last 3 consecutive runs for an agent produce identical grades, flag as "saturated" — the expected ranges may need tightening.
 
 ### 7. Save transcript
 
-Create `$TOOLKIT_ROOT/evals/transcripts/<timestamp>-<agent>.json`:
+Create `evals/transcripts/<timestamp>-<agent>.json`:
 
 ```json
 {
@@ -135,7 +127,7 @@ Create `$TOOLKIT_ROOT/evals/transcripts/<timestamp>-<agent>.json`:
 
 ### 8. Generate report
 
-Save to `$TOOLKIT_ROOT/evals/reports/<timestamp>-report.md` and display:
+Save to `evals/reports/<timestamp>-report.md` and display:
 
 ```
 # Eval Report — <timestamp>
