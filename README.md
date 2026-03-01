@@ -1,6 +1,6 @@
 # cab-killer
 
-A multi-agent code review toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Nine specialized review agents, three automation skills, and deterministic hooks — all packaged as a portable `.claude/` directory you copy into any project.
+A multi-agent code review toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Specialized review agents, automation skills, and deterministic hooks — all packaged as a portable `.claude/` directory you copy into any project.
 
 ## Why
 
