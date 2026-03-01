@@ -28,6 +28,11 @@ Return `{"status": "skip", "issues": [], "summary": "No source files with securi
 
 ## Detect
 
+Semgrep context: If semgrep findings are provided in the review
+context, incorporate them — assess exploitability and real-world
+risk. Focus AI analysis on issues semgrep cannot detect (logic
+flaws, authz gaps, business-layer leaks).
+
 Injection:
 
 - SQL: unsanitized input in queries, missing parameterized queries

@@ -30,6 +30,7 @@ Agents, skills, and hooks that run inside Claude Code.
 - `/eval-audit` — Audit agents/skills/hooks for eval system compliance
 - `/eval-runner` — Run eval fixtures against agents and grade results
 - `/review-agent <name>` — Run a single agent
+- `/semgrep-analyze [path] [--rules <ruleset>]` — Run Semgrep static analysis with structured output
 - `/review-summary` — Generate compact (<150 word) session summary for cross-session context
 
 ## Hooks (PostToolUse, advisory)

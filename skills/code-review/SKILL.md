@@ -11,7 +11,8 @@ user-invocable: true
 allowed-tools: >-
   Read, Grep, Glob, Bash(git diff *), Bash(npx *), Bash(npm run *),
   Bash(pnpm *), Bash(yarn *), Bash(tsc *), Bash(eslint *),
-  Bash(git log *), Bash(gh run *), Skill(review-agent *)
+  Bash(git log *), Bash(gh run *), Bash(semgrep *),
+  Skill(review-agent *)
 ---
 
 # Code Review
@@ -106,7 +107,14 @@ Sequence (stop on first failure unless `--force`):
 3. **Secret scan**: Grep target files for common secret patterns
    (`(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}`).
    If found, report and stop.
-4. **Pipeline-red check**: Run `git log --oneline -1` and check if
+4. **Semgrep SAST**: Run
+   `semgrep scan --config auto --quiet --json` on target files if
+   `semgrep` is installed. ERROR-severity findings → gate fails
+   (stop unless `--force`). WARNING-severity findings → include in
+   report but don't stop. Skip silently if `semgrep` is not
+   installed. Save findings to pass as context to security-review
+   agent in step 4.
+5. **Pipeline-red check**: Run `git log --oneline -1` and check if
    there's a failing CI status on the current branch (run
    `gh run list --branch $(git branch --show-current) --limit 1`
    `--json conclusion -q '.[0].conclusion'` if `gh` is available).
@@ -157,6 +165,11 @@ parameter:
 - `small` → use `model: "haiku"` for the Agent tool
 - `mid` → use `model: "sonnet"` for the Agent tool
 - `frontier` → use default model (no model parameter needed)
+
+**Semgrep context**: If semgrep findings were collected in gate 4,
+pass them as additional context to the security-review agent prompt.
+This lets the agent assess exploitability and focus AI analysis on
+issues semgrep cannot detect.
 
 **Parallelism**: Launch all agents concurrently using multiple Agent
 tool calls in a single message. Wait for all to complete before
