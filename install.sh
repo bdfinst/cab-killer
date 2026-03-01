@@ -14,6 +14,7 @@ CAB_KILLER_MARKETPLACE="cab-killer"
 REFACTORING_REPO="elifiner/refactoring"
 REFACTORING_MARKETPLACE="refactoring"
 WITH_REFACTORING=false
+CLEAN=false
 
 usage() {
   cat <<'USAGE'
@@ -22,19 +23,22 @@ Usage: ./install.sh [OPTIONS]
 Install cab-killer as a Claude Code plugin.
 
 Options:
+  --clean             Remove existing marketplace and plugin before installing
   --with-refactoring  Also install the refactoring plugin for legacy code
   --help              Show this help message
 
 Examples:
   ./install.sh
+  ./install.sh --clean
   ./install.sh --with-refactoring
   curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash -s -- --with-refactoring
+  curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash -s -- --clean
 USAGE
 }
 
 for arg in "$@"; do
   case "$arg" in
+    --clean) CLEAN=true ;;
     --with-refactoring) WITH_REFACTORING=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option: $arg"; usage; exit 1 ;;
@@ -46,6 +50,18 @@ if ! command -v claude &>/dev/null; then
   echo "Error: 'claude' CLI not found. Install Claude Code first:"
   echo "  https://docs.anthropic.com/en/docs/claude-code"
   exit 1
+fi
+
+if [ "$CLEAN" = true ]; then
+  echo "Removing existing cab-killer installation..."
+  claude plugin uninstall "cab-killer@${CAB_KILLER_MARKETPLACE}" 2>/dev/null || true
+  claude plugin marketplace remove "$CAB_KILLER_MARKETPLACE" 2>/dev/null || true
+  if [ "$WITH_REFACTORING" = true ]; then
+    claude plugin uninstall "refactoring@${REFACTORING_MARKETPLACE}" 2>/dev/null || true
+    claude plugin marketplace remove "$REFACTORING_MARKETPLACE" 2>/dev/null || true
+  fi
+  echo "Clean complete."
+  echo ""
 fi
 
 echo "Adding cab-killer marketplace..."
