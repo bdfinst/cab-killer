@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "cab-killer",
-      "source": ".",
+      "source": "./",
       "description": "Multi-agent code review toolkit for Claude Code",
       "version": "1.0.0",
       "author": {
