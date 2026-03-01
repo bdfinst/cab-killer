@@ -33,7 +33,11 @@ For each agent file in `.claude/agents/*.md`, check if the config disables it (`
 
 ### 3. Run each enabled agent
 
-For each enabled agent, read its definition from `.claude/agents/<name>.md` and review the target files following the agent's instructions. Produce a JSON result per agent:
+For each enabled agent, read its definition from `.claude/agents/<name>.md` and review the target files following the agent's instructions.
+
+**File filtering**: If the agent's config has a `filePatterns` array (e.g., `["*.js", "*.ts"]`), only pass files matching those patterns to the agent. If the agent definition itself states a file scope (e.g., "JavaScript and TypeScript files only"), respect that. Skip the agent entirely if no target files match its patterns.
+
+Produce a JSON result per agent:
 
 ```json
 {"agentName": "<name>", "status": "pass|warn|fail", "issues": [...], "summary": "..."}

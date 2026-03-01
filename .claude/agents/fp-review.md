@@ -1,5 +1,7 @@
 # FP Review
 
+Scope: JavaScript and TypeScript files only (`.js`, `.ts`, `.jsx`, `.tsx`). Skip this agent entirely if the project has no JS/TS files.
+
 Output JSON:
 ```json
 {"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}

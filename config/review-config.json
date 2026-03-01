@@ -37,6 +37,7 @@
     },
     "fp-review": {
       "enabled": true,
+      "filePatterns": ["*.js", "*.ts", "*.jsx", "*.tsx"],
       "allowedMutablePrefixes": ["mut", "mutable", "_"],
       "strictMode": true
     }
