@@ -24,6 +24,21 @@
     "claude-setup-review": {
       "enabled": true,
       "severityThreshold": "warning"
+    },
+    "token-efficiency-review": {
+      "enabled": true,
+      "maxClaudeMdLength": 5000,
+      "maxFileLength": 500,
+      "maxFunctionLength": 50
+    },
+    "security-review": {
+      "enabled": true,
+      "severityThreshold": "warning"
+    },
+    "fp-review": {
+      "enabled": true,
+      "allowedMutablePrefixes": ["mut", "mutable", "_"],
+      "strictMode": true
     }
   },
   "orchestrator": {

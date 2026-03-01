@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/fp-review.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/token-efficiency-review.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/eval-compliance-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

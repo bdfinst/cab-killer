@@ -1,175 +1,169 @@
 # cab-killer
 
-A multi-agent code review system that uses Claude Code to independently review code written by AI coding agents. Each specialized review agent focuses on a specific aspect of code quality, and an orchestrator coordinates their execution.
+A multi-agent code review toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Nine specialized review agents, three automation skills, and deterministic hooks — all packaged as a portable `.claude/` directory you copy into any project.
 
-## Why?
+## Why
 
-AI coding agents produce code fast, but without oversight they accumulate quality debt: weak tests, poor naming, tight coupling, security holes, unnecessary mutations. **cab-killer** runs a suite of focused review agents against your codebase and produces actionable correction prompts that can be fed back to a coding agent to fix the issues automatically.
+Coding agents write code fast but skip quality checks. cab-killer adds automated review for test quality, structure, naming, domain boundaries, complexity, security, functional purity, token efficiency, and Claude setup — without leaving your Claude Code workflow.
 
 ## How It Works
 
-1. **Review** - The orchestrator loads your source files and sends them through specialized review agents. Each agent is powered by Claude Code (`claude --print`) with a domain-specific prompt.
-2. **Report** - Each agent returns structured JSON with issues, severity levels, and suggested fixes. Results are aggregated into a unified report.
-3. **Fix** - Correction prompts are saved as individual JSON files. The `apply-fixes` command spawns independent Claude Code agents to apply each fix, then validates with lint/build/tests.
+1. **Agents** (`.claude/agents/*.md`) — LLM-native prompt definitions that each focus on one aspect of code quality
+2. **Skills** (`.claude/skills/`) — Orchestration workflows invoked via slash commands
+3. **Hooks** (`.claude/hooks/`) — Deterministic shell scripts that fire on every Write/Edit for instant feedback
+
+## Install
+
+```bash
+# Clone the toolkit
+git clone https://github.com/your-org/cab-killer.git
+
+# Copy into your project
+cp -r cab-killer/.claude/ your-project/.claude/
+cp -r cab-killer/config/ your-project/config/
+```
+
+The `.claude/settings.json` registers the hooks automatically when Claude Code loads the project.
+
+## Usage
+
+### Run all review agents
 
 ```
-                        Orchestrator
-                            |
-      ┌──────────┬──────────┼──────────┬──────────┐
-      v          v          v          v          v
-  test-review  naming   security   fp-review   ...
-      |          |          |          |          |
-      └──────────┴──────────┴──────────┴──────────┘
-                            |
-                    Aggregated Report
-                            |
-                   Correction Prompts
-                            |
-                    Fix Orchestrator
-                     (apply-fixes)
+/code-review
 ```
+
+Options:
+- `/code-review --changed` — review only uncommitted changes
+- `/code-review --since main` — review files changed since a branch
+- `/code-review --agent test-review` — run a single agent
+
+### Run a single agent
+
+```
+/review-agent test-review
+/review-agent security-review --changed
+/review-agent fp-review --since main
+```
+
+### Apply fixes
+
+After `/code-review` generates correction prompts, apply them:
+
+```
+/apply-fixes ./corrections
+/apply-fixes ./corrections --skip-tests --skip-lint
+/apply-fixes ./corrections --dry
+```
+
+The fix workflow:
+1. Loads each correction prompt JSON file
+2. Reads repository rules (CLAUDE.md, .clinerules, CONTRIBUTING.md)
+3. Applies the minimal fix
+4. Runs validation (lint, build, tests) after each fix
+5. Reports results
+
+### Audit eval compliance
+
+```
+/eval-audit
+/eval-audit .claude/agents/fp-review.md
+```
+
+Checks all agents, skills, and hooks for structural compliance (output format, severity levels, numbered steps, etc.).
 
 ## Review Agents
 
 | Agent | What it checks |
 |-------|---------------|
-| **test-review** | Test quality, coverage, and effectiveness |
-| **structure-review** | Code organization and architecture |
-| **naming-review** | Naming clarity and consistency |
-| **domain-review** | Domain separation and boundary clarity |
-| **complexity-review** | Excessive cyclomatic complexity |
-| **claude-setup-review** | CLAUDE.md content, structure, and skill definitions |
-| **token-efficiency-review** | Optimizes config and code for minimal token usage |
-| **security-review** | Injection, auth, secrets, crypto, and input validation |
-| **fp-review** | Detects mutations and impure patterns in functional code |
+| `test-review` | Coverage gaps, assertion quality, test hygiene, missing edge cases |
+| `structure-review` | SRP violations, DRY, coupling, nesting depth, file organization |
+| `naming-review` | Intent-revealing names, boolean prefixes, magic values, consistency |
+| `domain-review` | Business logic placement, abstraction leaks, entity/DTO confusion, boundaries |
+| `complexity-review` | Function size (<20 lines), cyclomatic complexity (<10), nesting (<4), parameters (<5) |
+| `claude-setup-review` | CLAUDE.md completeness, rules, skills, path accuracy |
+| `token-efficiency-review` | CLAUDE.md length, file/function size, nesting, duplicate code, LLM anti-patterns |
+| `security-review` | Injection, auth/authz, data exposure, security headers, crypto, input validation |
+| `fp-review` | let→const, array mutations, parameter mutations, global state, Object.assign |
 
-## Requirements
+## Hooks
 
-- Node.js 18+
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+Hooks fire automatically on every `Write` or `Edit` via PostToolUse. They are advisory only (never block).
 
-## Install
-
-```bash
-git clone <repo-url>
-cd cab-killer
-npm install
-```
-
-## Usage
-
-### Review code
-
-```bash
-# Review current directory (all agents)
-node src/index.js .
-
-# Review a specific project
-node src/index.js /path/to/project
-
-# Run a single agent
-node src/index.js --agent security-review ./src
-
-# Run agents in parallel
-node src/index.js --parallel .
-
-# Review only uncommitted changes
-node src/index.js --changed .
-
-# Review changes since a branch
-node src/index.js --since main .
-
-# Output as JSON or markdown
-node src/index.js --json .
-node src/index.js --markdown --output report.md .
-
-# Save correction prompts for later fixing
-node src/index.js --prompts-output ./prompts-output .
-```
-
-### Apply fixes
-
-```bash
-# Apply fixes from saved prompts (runs lint/build/tests after each)
-node src/index.js apply-fixes ./prompts-output
-
-# Dry run to preview
-node src/index.js apply-fixes ./prompts-output --dry
-
-# Skip validation steps
-node src/index.js apply-fixes ./prompts-output --skip-tests --skip-build --skip-lint
-
-# Target a different repo
-node src/index.js apply-fixes ./prompts-output --repo /path/to/target
-```
-
-### Loop mode
-
-Runs all agents, generates fixes, and repeats until issues are resolved (up to `--max-iterations`):
-
-```bash
-node src/index.js --mode loop --max-iterations 3 .
-```
+| Hook | Triggers on | What it checks |
+|------|------------|----------------|
+| `fp-review.sh` | JS/TS files | `.push()`, `.sort()`, `Object.assign(obj, ...)`, global mutations |
+| `token-efficiency-review.sh` | All source files | File >500 lines, CLAUDE.md >5000 chars, functions >50 lines |
+| `eval-compliance-check.sh` | Agent/skill files | Output format, severity levels, numbered steps |
 
 ## Configuration
 
-Create `config/review-config.json` to enable/disable agents and tune thresholds:
+Edit `config/review-config.json` to enable/disable agents and set thresholds:
 
 ```json
 {
   "agents": {
-    "test-review": { "enabled": true, "severity_threshold": "warning" },
-    "complexity-review": { "enabled": true, "max_complexity": 10 },
-    "fp-review": { "enabled": true, "strictMode": true },
-    "security-review": { "enabled": true }
+    "test-review": { "enabled": true, "severityThreshold": "warning" },
+    "complexity-review": { "enabled": true, "maxComplexity": 10 },
+    "security-review": { "enabled": true },
+    "fp-review": { "enabled": true }
   },
   "orchestrator": {
-    "max_loop_iterations": 5,
-    "fail_on_error": true
+    "maxLoopIterations": 5,
+    "failOnError": true
   }
 }
 ```
 
+Agents not listed are enabled by default.
+
 ## Output Format
 
-Each agent returns:
+Each agent produces:
 
 ```json
 {
-  "agentName": "security-review",
-  "status": "warn",
+  "agentName": "test-review",
+  "status": "pass|warn|fail",
   "issues": [
     {
-      "severity": "error",
-      "file": "src/auth.js",
+      "severity": "error|warning|suggestion",
+      "file": "src/utils/parser.js",
       "line": 42,
-      "message": "Hardcoded API key",
-      "suggestedFix": "Move to environment variable"
+      "message": "Function lacks test coverage",
+      "suggestedFix": "Add unit test for parseInput()"
     }
   ],
-  "summary": "Found 1 hardcoded credential"
+  "summary": "Found 1 issue with test coverage"
 }
 ```
 
-Correction prompts for the fix pipeline:
+Correction prompts for `/apply-fixes`:
 
 ```json
 {
-  "priority": "high",
-  "category": "security-review",
-  "instruction": "Move hardcoded API key to environment variable",
-  "context": "src/auth.js contains a hardcoded credential on line 42",
-  "affectedFiles": ["src/auth.js"]
+  "priority": "high|medium|low",
+  "category": "test-review",
+  "instruction": "Fix: Function lacks test coverage (Suggested: Add unit test for parseInput())",
+  "context": "Line 42 in src/utils/parser.js",
+  "affectedFiles": ["src/utils/parser.js"]
 }
 ```
 
-## Development
+## Customization
 
-```bash
-npm test              # Run tests
-npm run lint          # Lint
-npm run format        # Format with Prettier
-```
+### Add a new agent
+
+1. Create `.claude/agents/my-agent.md` with output format, severity levels, and detection rules
+2. Add a config entry in `config/review-config.json`
+3. Run `/eval-audit` to verify compliance
+
+### Add a deterministic hook
+
+1. Create `.claude/hooks/my-check.sh` (must exit 0, read stdin for file path)
+2. Register in `.claude/settings.json` under `PostToolUse`
+
+See `docs/eval-system.md` for the full eval architecture.
 
 ## License
 
