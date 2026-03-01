@@ -18,17 +18,19 @@ Coding agents write code fast but skip quality checks. cab-killer adds automated
 # Clone the toolkit
 git clone https://github.com/your-org/cab-killer.git
 
-# Symlink into your project (recommended — stays up to date)
+# Install into your project (symlinks agents, skills, hooks; merges hook config)
 cab-killer/install.sh /path/to/your-project
-
-# Or copy if you prefer a standalone install
-cp -r cab-killer/.claude/ your-project/.claude/
-cp -r cab-killer/config/ your-project/config/
 ```
 
-The symlink approach lets you `git pull` the toolkit repo and all projects get the update immediately. To remove symlinks: `install.sh /path/to/project --uninstall`.
+The install script:
+- Symlinks `.claude/agents/`, `.claude/skills/`, and `.claude/hooks/` into your project
+- Merges cab-killer hooks into your existing `.claude/settings.json` (or creates one)
+- Appends a toolkit reference to your `CLAUDE.md`
+- Adds symlink paths to `.gitignore`
 
-The `.claude/settings.json` registers the hooks automatically when Claude Code loads the project.
+Updates propagate automatically — just `git pull` the toolkit repo. To remove: `install.sh /path/to/project --uninstall`.
+
+Requires `jq` for settings.json merging.
 
 ## Usage
 
@@ -103,7 +105,7 @@ Hooks fire automatically on every `Write` or `Edit` via PostToolUse. They are ad
 
 ## Configuration
 
-Edit `config/review-config.json` to enable/disable agents and set thresholds:
+All agents are enabled by default with no config file required. To customize, create `config/review-config.json` in your project to enable/disable agents and set thresholds:
 
 ```json
 {

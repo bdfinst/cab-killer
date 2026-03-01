@@ -52,16 +52,35 @@ if $UNINSTALL; then
     fi
   done
 
-  # Remove settings.json symlink
-  if [ -L "$CLAUDE_DIR/settings.json" ]; then
-    rm "$CLAUDE_DIR/settings.json"
-    info "Removed $CLAUDE_DIR/settings.json"
-  fi
+  # Remove cab-killer hooks from settings.json
+  SETTINGS="$CLAUDE_DIR/settings.json"
+  if [ -f "$SETTINGS" ] && command -v jq &>/dev/null; then
+    # Remove hooks whose command starts with .claude/hooks/ (cab-killer hooks)
+    UPDATED=$(jq '
+      if .hooks.PostToolUse then
+        .hooks.PostToolUse |= map(
+          .hooks |= map(select(.command | startswith(".claude/hooks/") | not))
+        ) |
+        .hooks.PostToolUse |= map(select(.hooks | length > 0))
+      else . end
+    ' "$SETTINGS")
 
-  # Remove config symlink
-  if [ -L "$TARGET_DIR/config" ]; then
-    rm "$TARGET_DIR/config"
-    info "Removed $TARGET_DIR/config"
+    # If PostToolUse is now empty, remove it; if hooks is empty, remove it
+    UPDATED=$(echo "$UPDATED" | jq '
+      if .hooks.PostToolUse and (.hooks.PostToolUse | length) == 0 then del(.hooks.PostToolUse) else . end |
+      if .hooks and (.hooks | length) == 0 then del(.hooks) else . end
+    ')
+
+    # If the whole file is now {}, remove it
+    if [ "$(echo "$UPDATED" | jq -c '.')" = "{}" ]; then
+      rm "$SETTINGS"
+      info "Removed empty settings.json"
+    else
+      echo "$UPDATED" > "$SETTINGS"
+      info "Removed cab-killer hooks from settings.json"
+    fi
+  else
+    warn "jq not found — remove cab-killer hooks from $SETTINGS manually"
   fi
 
   # Remove .claude dir if empty
@@ -125,45 +144,60 @@ for dir in "${DIRS[@]}"; do
   info "Linked .claude/$dir → $src"
 done
 
-# Symlink settings.json
-SETTINGS_SRC="$TOOLKIT_ROOT/.claude/settings.json"
-SETTINGS_DEST="$CLAUDE_DIR/settings.json"
-if [ -f "$SETTINGS_SRC" ]; then
-  if [ -L "$SETTINGS_DEST" ]; then
-    current_target="$(readlink "$SETTINGS_DEST")"
-    if [ "$current_target" = "$SETTINGS_SRC" ]; then
-      info "settings.json already linked (up to date)"
-    else
-      rm "$SETTINGS_DEST"
-      ln -s "$SETTINGS_SRC" "$SETTINGS_DEST"
-      warn "settings.json was linked elsewhere — re-linked"
-    fi
-  elif [ -e "$SETTINGS_DEST" ]; then
-    error "$SETTINGS_DEST exists and is not a symlink — skipping (move it manually)"
-  else
-    ln -s "$SETTINGS_SRC" "$SETTINGS_DEST"
-    info "Linked .claude/settings.json"
-  fi
-fi
+# ------------------------------------------------------------------
+# Merge hooks into settings.json
+# ------------------------------------------------------------------
+SETTINGS="$CLAUDE_DIR/settings.json"
+CAB_KILLER_HOOKS='[
+  {"type":"command","command":".claude/hooks/fp-review.sh"},
+  {"type":"command","command":".claude/hooks/token-efficiency-review.sh"},
+  {"type":"command","command":".claude/hooks/eval-compliance-check.sh"}
+]'
 
-# Symlink config directory
-CONFIG_SRC="$TOOLKIT_ROOT/config"
-CONFIG_DEST="$TARGET_DIR/config"
-if [ -d "$CONFIG_SRC" ]; then
-  if [ -L "$CONFIG_DEST" ]; then
-    current_target="$(readlink "$CONFIG_DEST")"
-    if [ "$current_target" = "$CONFIG_SRC" ]; then
-      info "config/ already linked (up to date)"
+if ! command -v jq &>/dev/null; then
+  warn "jq not found — cannot merge settings.json automatically"
+  warn "Add the following hooks to $SETTINGS manually:"
+  echo "$CAB_KILLER_HOOKS"
+else
+  if [ -f "$SETTINGS" ]; then
+    # Check if our hooks are already present
+    EXISTING_HOOKS=$(jq -r '
+      [.hooks.PostToolUse[]?.hooks[]?.command // empty] | join(",")
+    ' "$SETTINGS" 2>/dev/null || echo "")
+
+    if echo "$EXISTING_HOOKS" | grep -q "fp-review.sh"; then
+      info "settings.json already has cab-killer hooks (up to date)"
     else
-      rm "$CONFIG_DEST"
-      ln -s "$CONFIG_SRC" "$CONFIG_DEST"
-      warn "config/ was linked elsewhere — re-linked"
+      # Merge: find existing Edit|Write matcher or create one
+      UPDATED=$(jq --argjson new_hooks "$CAB_KILLER_HOOKS" '
+        if .hooks == null then .hooks = {} else . end |
+        if .hooks.PostToolUse == null then .hooks.PostToolUse = [] else . end |
+
+        # Find an existing Edit|Write matcher
+        (.hooks.PostToolUse | map(.matcher) | index("Edit|Write")) as $idx |
+
+        if $idx != null then
+          # Append our hooks to the existing matcher
+          .hooks.PostToolUse[$idx].hooks += $new_hooks
+        else
+          # Create a new matcher entry
+          .hooks.PostToolUse += [{"matcher": "Edit|Write", "hooks": $new_hooks}]
+        end
+      ' "$SETTINGS")
+
+      echo "$UPDATED" | jq '.' > "$SETTINGS"
+      info "Merged cab-killer hooks into existing settings.json"
     fi
-  elif [ -e "$CONFIG_DEST" ]; then
-    error "$CONFIG_DEST exists and is not a symlink — skipping (move it manually)"
   else
-    ln -s "$CONFIG_SRC" "$CONFIG_DEST"
-    info "Linked config/"
+    # Create new settings.json
+    jq -n --argjson hooks "$CAB_KILLER_HOOKS" '{
+      hooks: {
+        PostToolUse: [
+          {matcher: "Edit|Write", hooks: $hooks}
+        ]
+      }
+    }' > "$SETTINGS"
+    info "Created settings.json with cab-killer hooks"
   fi
 fi
 
@@ -210,8 +244,6 @@ else
 .claude/agents
 .claude/skills
 .claude/hooks
-.claude/settings.json
-config
 EOF
   info "Added symlink paths to .gitignore"
 fi

@@ -27,7 +27,9 @@ Based on arguments, build a file list:
 
 ### 2. Load configuration
 
-Read `config/review-config.json`. For each agent in `.claude/agents/*.md`, check if it is enabled (default: enabled unless `"enabled": false`).
+Look for `config/review-config.json` in the current working directory. If it exists, read it. If not, treat all agents as enabled with default thresholds.
+
+For each agent file in `.claude/agents/*.md`, check if the config disables it (`"enabled": false`). Agents not mentioned in the config are enabled by default.
 
 ### 3. Run each enabled agent
 
