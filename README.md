@@ -18,10 +18,15 @@ Coding agents write code fast but skip quality checks. cab-killer adds automated
 # Clone the toolkit
 git clone https://github.com/your-org/cab-killer.git
 
-# Copy into your project
+# Symlink into your project (recommended — stays up to date)
+cab-killer/install.sh /path/to/your-project
+
+# Or copy if you prefer a standalone install
 cp -r cab-killer/.claude/ your-project/.claude/
 cp -r cab-killer/config/ your-project/config/
 ```
+
+The symlink approach lets you `git pull` the toolkit repo and all projects get the update immediately. To remove symlinks: `install.sh /path/to/project --uninstall`.
 
 The `.claude/settings.json` registers the hooks automatically when Claude Code loads the project.
 

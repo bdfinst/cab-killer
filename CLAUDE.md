@@ -35,4 +35,4 @@ A reusable `.claude/` toolkit that adds multi-agent code review to any project. 
 
 ## Install
 
-Copy `.claude/` and `config/` into your project. See README.md for details.
+Run `./install.sh /path/to/project` to symlink into a target project, or copy `.claude/` and `config/` manually. See README.md for details.
