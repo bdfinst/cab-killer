@@ -105,17 +105,32 @@ fi
 if [ "$FILE_TYPE" = "skill" ]; then
   SKILL_NAME=$(echo "$FILE_PATH" | sed 's|.*skills/||; s|/SKILL.md||')
 
-  # 1. Structured steps (FAIL)
+  # 1. Role declaration (WARN)
+  if ! echo "$CONTENT" | grep -qiE 'role:\s*(orchestrator|worker|implementation)'; then
+    warn "$SKILL_NAME: Missing 'Role:' declaration (must be orchestrator, worker, or implementation)."
+  fi
+
+  # 2. Constraints section (WARN)
+  if ! echo "$CONTENT" | grep -qiE 'constraints'; then
+    warn "$SKILL_NAME: Missing constraints section for role boundaries."
+  fi
+
+  # 3. Conciseness directive (WARN)
+  if ! echo "$CONTENT" | grep -qiE 'be concise|concise'; then
+    warn "$SKILL_NAME: Missing conciseness directive (must instruct concise output to reduce token usage)."
+  fi
+
+  # 4. Structured steps (FAIL)
   if ! echo "$CONTENT" | grep -qE '### [0-9]+\.|## Steps'; then
     fail "$SKILL_NAME: Missing numbered steps."
   fi
 
-  # 2. Argument parsing (WARN)
+  # 4. Argument parsing (WARN)
   if ! echo "$CONTENT" | grep -qiE 'argument|parse|args'; then
     warn "$SKILL_NAME: Missing argument parsing section."
   fi
 
-  # 3. Output/report section (WARN)
+  # 5. Output/report section (WARN)
   if echo "$CONTENT" | grep -qiE 'review|audit|fix'; then
     if ! echo "$CONTENT" | grep -qiE 'report|summary|output'; then
       warn "$SKILL_NAME: Review-related skill missing report/summary section."

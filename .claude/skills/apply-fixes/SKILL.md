@@ -2,14 +2,23 @@
 name: apply-fixes
 description: Apply correction prompts from a review run. Use after /code-review generates correction prompts in a corrections/ directory.
 argument-hint: "<corrections-dir> [--dry] [--skip-tests] [--skip-build] [--skip-lint]"
-disable-model-invocation: true
 user-invocable: true
 allowed-tools: Read, Edit, Grep, Glob, Bash(git diff *, npm run *, npx *, yarn *, pnpm *)
 ---
 
 # Apply Fixes
 
+Role: implementation. This skill modifies code — it receives correction prompts and applies minimal fixes.
+
 You have been invoked with the `/apply-fixes` skill. Load correction prompt JSON files and apply each fix.
+
+## Implementation constraints
+
+1. **Apply the minimal fix.** Do not refactor, reorganize, or improve beyond what the correction prompt instructs.
+2. **Validate after each fix.** Run lint/build/tests unless skipped. If validation fails, report and move on — do not attempt cascading fixes.
+3. **Follow repository rules.** Read CLAUDE.md, .clinerules, CONTRIBUTING.md before applying fixes.
+4. **One concern per fix.** Each correction prompt addresses one issue. Do not combine or reorder fixes.
+5. **Be concise.** Report results in the summary table format. No narration of each step — just the outcome.
 
 ## Parse Arguments
 

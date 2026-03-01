@@ -2,17 +2,29 @@
 name: code-review
 description: Run all enabled review agents against target files. Use after implementing features, before PRs, or when the user asks for a code review.
 argument-hint: "[--agent <name>] [--changed | --since <ref>] [--path <dir>] [--json] [--force]"
-disable-model-invocation: true
 user-invocable: true
-allowed-tools: Read, Grep, Glob, Bash(git diff *), Bash(npx *), Bash(npm run *), Bash(pnpm *), Bash(yarn *), Bash(tsc *), Bash(eslint *), Bash(git log *), Skill(review-agent *)
+allowed-tools: Read, Grep, Glob, Bash(git diff *), Bash(npx *), Bash(npm run *), Bash(pnpm *), Bash(yarn *), Bash(tsc *), Bash(eslint *), Bash(git log *), Bash(gh run *), Skill(review-agent *)
 ---
 
 # Code Review
+
+Role: orchestrator. This skill routes work — it does not review code itself.
 
 You have been invoked with the `/code-review` skill. Run all enabled review agents and produce a summary.
 
 For output format details, see [output-format.md](output-format.md).
 For an example report, see [examples/sample-report.md](examples/sample-report.md).
+
+## Orchestrator constraints
+
+Follow these constraints from the [Minimum CD agent configuration](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) pattern:
+
+1. **Do not review code yourself.** Delegate all semantic analysis to review agents.
+2. **Minimize context passed to agents.** Each agent receives only what its `Context needs` field requires.
+3. **Route to the right model tier.** Each agent declares its tier — pass it through when spawning subagents.
+4. **Run deterministic gates first.** Standard tooling (lint, type-check, secret scan) is cheaper than AI review. Do not invoke agents if gates fail.
+5. **Return structured results.** Aggregate agent JSON into a summary — do not add your own findings.
+6. **Be concise.** Use tables, JSON, and short sentences. No preambles, no filler, no restating the task. Every output token costs money.
 
 ## Parse Arguments
 

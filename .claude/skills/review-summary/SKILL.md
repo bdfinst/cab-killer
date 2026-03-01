@@ -2,14 +2,22 @@
 name: review-summary
 description: Generate a compact session summary from the most recent code review results. Supports context continuity across sessions.
 argument-hint: "[--from <json-file>]"
-disable-model-invocation: true
 user-invocable: true
-allowed-tools: Read, Write, Glob, Bash(date *), Bash(git rev-parse *), Bash(git branch *)
+allowed-tools: Read, Write, Glob, Bash(date *), Bash(git rev-parse *), Bash(git branch *), Bash(mkdir *)
 ---
 
 # Review Summary
 
+Role: orchestrator. This skill summarizes and persists review results — it does not review code.
+
 You have been invoked with the `/review-summary` skill. Generate a compact summary of the most recent code review.
+
+## Orchestrator constraints
+
+1. **Do not re-analyze code.** Summarize existing review results only.
+2. **Keep summaries under 150 words.** Compact summaries replace full conversation history for future sessions (per [Minimum CD session closure](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) pattern).
+3. **Use the template exactly.** Structured output enables machine parsing.
+4. **Be concise.** The 150-word limit is a ceiling, not a target. Shorter is better. No filler phrases.
 
 ## Parse Arguments
 

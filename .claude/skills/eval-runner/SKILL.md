@@ -2,14 +2,23 @@
 name: eval-runner
 description: Run eval fixtures against review agents and grade results. Use to validate agent accuracy and detect regressions.
 argument-hint: "[--agent <name>] [--fixture <name>] [--trials <n>] [--verbose]"
-disable-model-invocation: true
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash(readlink *, ls *, date *, mkdir *), Skill(review-agent *)
 ---
 
 # Eval Runner
 
+Role: orchestrator. This skill dispatches fixtures to agents and grades results — it does not review code itself.
+
 You have been invoked with the `/eval-runner` skill. Run review agents against eval fixtures and grade the results.
+
+## Orchestrator constraints
+
+1. **Do not review code yourself.** Delegate all reviews to `/review-agent`. Your job is dispatching and grading.
+2. **Grade deterministically.** Compare agent JSON output against expected JSON using exact criteria (status match, count ranges, keyword checks). Do not apply judgment.
+3. **Minimize context per agent.** Pass only the fixture file to the agent — not the expected results, not other fixtures, not prior transcripts.
+4. **Track results.** Save transcripts for saturation detection. Do not modify fixtures or expected files.
+5. **Be concise.** Output the report table and failure details. No narration of each fixture run — just the grades.
 
 ## Parse Arguments
 

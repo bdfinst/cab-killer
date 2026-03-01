@@ -8,7 +8,17 @@ allowed-tools: Read, Grep, Glob, Bash(git diff *)
 
 # Review Agent
 
+Role: worker. This skill performs the actual review using the agent definition as its specification.
+
 You have been invoked with the `/review-agent` skill. Run a single named review agent.
+
+## Worker constraints
+
+1. **Follow the agent definition exactly.** The agent file is your specification — detect what it says to detect, skip what it says to skip.
+2. **Respect context needs.** When `--changed` or `--since` is used, honor the agent's `Context needs` field (diff-only, full-file, or project-structure).
+3. **Do not add findings beyond the agent's scope.** If the agent says "Ignore: naming, tests" — do not flag naming or test issues.
+4. **Return structured JSON only.** Output the standard result format. Do not add prose commentary.
+5. **Be concise.** Issue messages should be one sentence. Suggested fixes should be actionable, not explanatory. No preambles or filler.
 
 ## Parse Arguments
 

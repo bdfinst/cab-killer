@@ -2,14 +2,22 @@
 name: eval-audit
 description: Audit code-review agents and skills for eval system compliance. Use when adding or modifying agents, skills, or hooks.
 argument-hint: "[file-path | --all] [--fix]"
-disable-model-invocation: true
 user-invocable: true
 allowed-tools: Read, Edit, Grep, Glob
 ---
 
 # Eval Audit
 
+Role: orchestrator. This skill performs mechanical compliance checks — pattern matching against known-good structure.
+
 You have been invoked with the `/eval-audit` skill. Audit agents and skills for compliance with the eval system patterns documented in `docs/eval-system.md`.
+
+## Orchestrator constraints
+
+1. **Check structure, not semantics.** Verify required sections, fields, and patterns exist. Do not evaluate whether detection rules are good — that's eval-runner's job.
+2. **Deterministic checks only.** Every check should be reproducible: does the field exist? Is the format correct? Does the section match the expected pattern?
+3. **When `--fix` is used, apply minimal structural fixes.** Insert missing sections/fields using templates. Do not rewrite existing content.
+4. **Be concise.** Output the report table and action items. No preambles, no per-file narration, no restating what was checked.
 
 ## Steps
 
@@ -57,23 +65,51 @@ Read each file in `.claude/agents/*.md` and check:
    - MUST show the skip JSON response format
    - WARN if skip section is missing
 
+8. **Model tier**: Does the agent declare `Model tier: small|mid|frontier`?
+   - All agents MUST declare which model tier they require
+   - Valid values: `small`, `mid`, `frontier`
+   - WARN if missing
+
+9. **Context needs**: Does the agent declare `Context needs: diff-only|full-file|project-structure`?
+   - All agents MUST declare what input context they need
+   - Valid values: `diff-only`, `full-file`, `project-structure`
+   - WARN if missing
+
 ### 3. Audit skills
 
 Read each file in `.claude/skills/*/SKILL.md` and check:
 
-1. **Structured steps**: Does the skill have numbered steps?
+1. **Role declaration**: Does the skill declare its role?
+   - All skills MUST have a `Role:` line (orchestrator, worker, or implementation)
+   - Orchestrators route work and aggregate results — they must not review or modify code
+   - Workers perform semantic analysis using agent definitions
+   - Implementation skills modify code following correction prompts
+   - WARN if role is missing
+
+2. **Constraints section**: Does the skill declare its boundaries?
+   - All skills SHOULD have a constraints section matching their role
+   - Orchestrators: must not review code, must delegate, must minimize context
+   - Workers: must follow agent definition, must return structured JSON
+   - Implementation: must apply minimal fixes, must validate after changes
+   - WARN if constraints are missing
+
+3. **Structured steps**: Does the skill have numbered steps?
    - All skills MUST have a clear sequence of steps
    - FAIL if steps are missing or unstructured
 
-2. **Argument parsing**: Does the skill document its arguments?
+4. **Argument parsing**: Does the skill document its arguments?
    - Skills MUST document required and optional arguments
    - WARN if argument section is missing
 
-3. **Output format**: Does the skill describe its output?
+5. **Output format**: Does the skill describe its output?
    - Skills that produce reports MUST define their output format
    - WARN if output format is missing
 
-4. **Validation gates**: Does the skill run validation where appropriate?
+6. **Conciseness directive**: Does the skill instruct concise output?
+   - All skills MUST include a "Be concise" constraint to minimize output tokens
+   - WARN if missing
+
+7. **Validation gates**: Does the skill run validation where appropriate?
    - Skills that modify code (apply-fixes) SHOULD run lint/build/tests
    - WARN if a code-modifying skill has no validation step
 
@@ -99,18 +135,18 @@ Read each file in `.claude/hooks/*.sh` and check:
 # Eval Audit Report
 
 ## Agents
-| Agent                     | Output Format | Severity | Detection | Scope | Self-Describing | File Scope | Skip | Status |
-|---------------------------|---------------|----------|-----------|-------|-----------------|------------|------|--------|
-| test-review               | PASS          | PASS     | PASS      | PASS  | PASS            | N/A        | PASS | OK     |
-| js-fp-review              | PASS          | PASS     | PASS      | PASS  | PASS            | PASS       | PASS | OK     |
-| ...                       |               |          |           |       |                 |            |      |        |
+| Agent                     | Output Format | Severity | Detection | Scope | Self-Describing | File Scope | Skip | Model Tier | Context Needs | Status |
+|---------------------------|---------------|----------|-----------|-------|-----------------|------------|------|------------|---------------|--------|
+| test-review               | PASS          | PASS     | PASS      | PASS  | PASS            | N/A        | PASS | PASS       | PASS          | OK     |
+| js-fp-review              | PASS          | PASS     | PASS      | PASS  | PASS            | PASS       | PASS | PASS       | PASS          | OK     |
+| ...                       |               |          |           |       |                 |            |      |            |               |        |
 
 ## Skills
-| Skill          | Steps | Arguments | Output | Validation | Status |
-|----------------|-------|-----------|--------|------------|--------|
-| code-review    | PASS  | PASS      | PASS   | N/A        | OK     |
-| apply-fixes    | PASS  | PASS      | PASS   | PASS       | OK     |
-| ...            |       |           |        |            |        |
+| Skill          | Role | Constraints | Steps | Arguments | Output | Validation | Status |
+|----------------|------|-------------|-------|-----------|--------|------------|--------|
+| code-review    | PASS | PASS        | PASS  | PASS      | PASS   | N/A        | OK     |
+| apply-fixes    | PASS | PASS        | PASS  | PASS      | PASS   | PASS       | OK     |
+| ...            |      |             |       |           |        |            |        |
 
 ## Hooks
 | Hook                        | Advisory | Input | Scope Filter | Status |
