@@ -10,7 +10,7 @@ Use this prompt inside Claude Code at the root of your existing toolkit reposito
 I have an existing repository that distributes Claude Code skills, agents, and hooks
 using a shell script (install.sh) that symlinks directories into target projects.
 I want to convert this into a proper Claude Code plugin so it can be installed
-cross-platform with `claude plugins install`.
+cross-platform with `claude plugin install`.
 
 ## Current repository structure
 
@@ -138,7 +138,7 @@ If no hooks exist, skip this step.
 
 ```bash
 # Install from GitHub
-claude plugins install https://github.com/<owner>/<repo>
+claude plugin install https://github.com/<owner>/<repo>
 
 # Or install locally during development
 claude --plugin-dir /path/to/this/repo
@@ -194,4 +194,4 @@ After making changes:
 2. Paste the prompt above
 3. Claude will audit your current structure and reorganize it
 4. Review the changes, then commit and push
-5. Install in any project with `claude plugins install https://github.com/<you>/<repo>`
+5. Install in any project with `claude plugin install https://github.com/<you>/<repo>`

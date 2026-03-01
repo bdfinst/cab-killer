@@ -47,7 +47,7 @@ if ! command -v claude &>/dev/null; then
 fi
 
 echo "Installing cab-killer..."
-if claude plugins install "$REPO_URL"; then
+if claude plugin install "$REPO_URL"; then
   echo "cab-killer installed successfully."
 else
   echo "Error: Failed to install cab-killer."
@@ -57,7 +57,7 @@ fi
 if [ "$WITH_REFACTORING" = true ]; then
   echo ""
   echo "Installing refactoring plugin..."
-  if claude plugins install "$REFACTORING_URL"; then
+  if claude plugin install "$REFACTORING_URL"; then
     echo "refactoring plugin installed successfully."
   else
     echo "Warning: Failed to install refactoring plugin. cab-killer is still installed."

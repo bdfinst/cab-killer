@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh 
 curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash -s -- --with-refactoring
 
 # Or install directly
-claude plugins install https://github.com/bdfinst/cab-killer
+claude plugin install https://github.com/bdfinst/cab-killer
 
 # Local clone for development
 claude --plugin-dir /path/to/cab-killer
@@ -126,11 +126,11 @@ Install:
 
 ```bash
 # From GitHub
-claude plugins install https://github.com/elifiner/refactoring
+claude plugin install https://github.com/elifiner/refactoring
 
 # Or clone locally and install
 git clone https://github.com/elifiner/refactoring.git
-claude plugins install ./refactoring
+claude plugin install ./refactoring
 ```
 
 Usage after `/code-review` identifies issues:
