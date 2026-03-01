@@ -2,11 +2,11 @@
 #
 # eval-compliance-check.sh - Claude Code PostToolUse hook
 #
-# Fires after Write or Edit on agent/skill files. Checks whether the
-# modified file follows eval system patterns for code-review agents.
+# Fires after Write or Edit on agent/skill files. Runs quick structural
+# checks and instructs Claude to run /eval-audit on agent files.
 #
 # Input: JSON on stdin with tool_input.file_path
-# Output: Warnings on stdout (shown to user as hook feedback)
+# Output: Feedback on stdout (shown to Claude as hook feedback)
 # Exit 0: Always (advisory, never blocks)
 
 set -uo pipefail
@@ -27,58 +27,85 @@ fi
 
 CONTENT=$(cat "$FILE_PATH")
 WARNINGS=""
+FAILS=""
+
+fail() {
+  FAILS="${FAILS}  FAIL: $1\n"
+}
 
 warn() {
-  WARNINGS="${WARNINGS}  [eval-audit] $1\n"
+  WARNINGS="${WARNINGS}  WARN: $1\n"
 }
 
 # --- Agent checks ---
 if [ "$FILE_TYPE" = "agent" ]; then
   AGENT_NAME=$(basename "$FILE_PATH" .md)
 
-  # Check for structured output format (all review agents should have one)
+  # 1. Structured output format (FAIL)
   if ! echo "$CONTENT" | grep -qiE 'output.*json|json.*output|status.*pass.*warn.*fail'; then
-    warn "$AGENT_NAME: Missing structured output format. Review agents should specify JSON output schema."
+    fail "$AGENT_NAME: Missing structured output format (must include status/issues/summary JSON schema)."
   fi
 
-  # Check for severity levels
+  # 2. Severity definitions (FAIL)
   if ! echo "$CONTENT" | grep -qiE 'severity.*error.*warning|error.*warning.*suggestion'; then
-    warn "$AGENT_NAME: Missing severity definitions. Review agents should define error/warning/suggestion levels."
+    fail "$AGENT_NAME: Missing severity definitions (must define error/warning/suggestion)."
   fi
 
-  # Check for detection rules
+  # 3. Detection rules (WARN)
   if ! echo "$CONTENT" | grep -qiE '## Detect|## Check|## Rules'; then
-    warn "$AGENT_NAME: Missing detection rules section. Review agents should list what they detect."
+    warn "$AGENT_NAME: Missing detection rules section."
   fi
+
+  # 4. Scope boundaries (WARN)
+  if ! echo "$CONTENT" | grep -qiE '## Ignore|handled by other'; then
+    warn "$AGENT_NAME: Missing scope boundaries (what does this agent NOT check?)."
+  fi
+
+  # Always require /eval-audit after agent changes
+  printf "\n"
+  if [ -n "$FAILS" ]; then
+    printf "$FAILS"
+  fi
+  if [ -n "$WARNINGS" ]; then
+    printf "$WARNINGS"
+  fi
+  printf "\n"
+  printf "  Agent file changed: $AGENT_NAME\n"
+  printf "  ACTION REQUIRED: Run /eval-audit $FILE_PATH\n"
 fi
 
 # --- Skill checks ---
 if [ "$FILE_TYPE" = "skill" ]; then
   SKILL_NAME=$(echo "$FILE_PATH" | sed 's|.*skills/||; s|/SKILL.md||')
 
-  # Check for structured steps
+  # 1. Structured steps (FAIL)
   if ! echo "$CONTENT" | grep -qE '### [0-9]+\.|## Steps'; then
-    warn "$SKILL_NAME: Missing numbered steps. Skills should have structured steps for reproducibility."
+    fail "$SKILL_NAME: Missing numbered steps."
   fi
 
-  # Check for argument parsing
+  # 2. Argument parsing (WARN)
   if ! echo "$CONTENT" | grep -qiE 'argument|parse|args'; then
     warn "$SKILL_NAME: Missing argument parsing section."
   fi
 
-  # Check for output/report section (review-related skills)
+  # 3. Output/report section (WARN)
   if echo "$CONTENT" | grep -qiE 'review|audit|fix'; then
     if ! echo "$CONTENT" | grep -qiE 'report|summary|output'; then
       warn "$SKILL_NAME: Review-related skill missing report/summary section."
     fi
   fi
-fi
 
-# --- Output warnings ---
-if [ -n "$WARNINGS" ]; then
-  printf "\n"
-  printf "$WARNINGS"
-  printf "  Run /eval-audit for a full compliance report.\n"
+  if [ -n "$FAILS" ] || [ -n "$WARNINGS" ]; then
+    printf "\n"
+    if [ -n "$FAILS" ]; then
+      printf "$FAILS"
+    fi
+    if [ -n "$WARNINGS" ]; then
+      printf "$WARNINGS"
+    fi
+    printf "\n"
+    printf "  Run /eval-audit for a full compliance report.\n"
+  fi
 fi
 
 exit 0
