@@ -42,5 +42,6 @@ Agents, skills, and hooks that run inside Claude Code.
 ## Install
 
 ```bash
-claude plugin install https://github.com/bdfinst/cab-killer
+claude plugin marketplace add bdfinst/cab-killer
+claude plugin install cab-killer@cab-killer
 ```

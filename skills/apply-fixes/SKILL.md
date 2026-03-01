@@ -127,4 +127,5 @@ unclear names), mention the
 alternative. It applies incremental, verified refactorings one at a
 time — better suited for complex structural changes than batch
 correction prompts.
-Install: `claude plugin install https://github.com/elifiner/refactoring`
+Install: `claude plugin marketplace add elifiner/refactoring &&
+claude plugin install refactoring@refactoring`
