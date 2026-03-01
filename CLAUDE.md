@@ -7,6 +7,7 @@ Agents, skills, and hooks that run inside Claude Code.
 
 | Agent | Focus | Model Tier |
 | ----- | ----- | ---------- |
+| a11y-review | WCAG 2.1 AA, semantic HTML, ARIA, keyboard nav, focus management | mid |
 | test-review | Test quality, coverage, assertions | mid |
 | structure-review | SRP, DRY, coupling, organization | mid |
 | naming-review | Naming clarity, conventions, magic values | small |
