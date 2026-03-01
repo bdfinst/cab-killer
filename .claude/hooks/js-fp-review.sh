@@ -8,13 +8,8 @@ set -euo pipefail
 # Read tool input from stdin
 INPUT=$(cat)
 
-# Extract the file path from the tool input
-FILE_PATH=$(echo "$INPUT" | grep -oP '"file_path"\s*:\s*"([^"]+)"' | head -1 | sed 's/.*"\([^"]*\)"/\1/' 2>/dev/null || true)
-
-# If no file path found, try alternate JSON key names
-if [ -z "$FILE_PATH" ]; then
-  FILE_PATH=$(echo "$INPUT" | grep -oP '"path"\s*:\s*"([^"]+)"' | head -1 | sed 's/.*"\([^"]*\)"/\1/' 2>/dev/null || true)
-fi
+# Extract the file path from the tool input (using jq for robust JSON parsing)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .file_path // .path // empty' 2>/dev/null || true)
 
 # Only check JS/TS files
 case "$FILE_PATH" in

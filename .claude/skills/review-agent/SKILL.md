@@ -1,7 +1,9 @@
 ---
 name: review-agent
-description: Run a single review agent against target files
+description: Run a single review agent against target files. Use when the user wants to run a specific agent by name rather than the full suite.
+argument-hint: "<agent-name> [--changed | --since <ref>] [--path <dir>]"
 user-invocable: true
+allowed-tools: Read, Grep, Glob, Bash(git diff *)
 ---
 
 # Review Agent
@@ -10,7 +12,9 @@ You have been invoked with the `/review-agent` skill. Run a single named review 
 
 ## Parse Arguments
 
-Required: agent name (e.g., `test-review`, `js-fp-review`, `security-review`)
+Arguments: $ARGUMENTS
+
+Required: agent name (`$0`, e.g., `test-review`, `js-fp-review`, `security-review`)
 
 Optional:
 - `--changed`: Review only uncommitted changes
