@@ -2,7 +2,7 @@
   "name": "cab-killer",
   "version": "1.0.0",
   "description": "Multi-agent code review toolkit for Claude Code",
-  "author": "Bryan Finster",
+  "author": { "name": "Bryan Finster" },
   "repository": "https://github.com/bdfinst/cab-killer",
   "license": "MIT"
 }
