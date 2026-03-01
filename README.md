@@ -1,6 +1,6 @@
 # cab-killer
 
-A multi-agent code review toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Specialized review agents, automation skills, and deterministic hooks — all packaged as a portable `.claude/` directory you copy into any project.
+A multi-agent code review plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Specialized review agents, automation skills, and deterministic hooks — installable as a Claude Code plugin.
 
 Architecture informed by the [Minimum CD Agentic CD](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) and [Pipeline Reference Architecture](https://migration.minimumcd.org/docs/pipeline-reference-architecture/) patterns: fail fast/fail cheap gate sequencing, separation of concerns per agent, model tiering for cost control, and context minimization for token efficiency.
 
@@ -11,29 +11,21 @@ Coding agents write code fast but skip quality checks. cab-killer adds automated
 ## How It Works
 
 1. **Pre-flight gates** — Deterministic checks (lint, type-check, secret scan) run first. Fail fast before spending tokens on AI agents.
-2. **Agents** (`.claude/agents/*.md`) — LLM-native prompt definitions that each focus on one aspect of code quality. Each declares its own model tier and context needs.
-3. **Skills** (`.claude/skills/`) — Orchestration workflows invoked via slash commands
-4. **Hooks** (`.claude/hooks/`) — Deterministic shell scripts that fire on every Write/Edit for instant feedback
+2. **Agents** (`agents/*.md`) — LLM-native prompt definitions that each focus on one aspect of code quality. Each declares its own model tier and context needs.
+3. **Skills** (`skills/`) — Orchestration workflows invoked via slash commands
+4. **Hooks** (`hooks/`) — Deterministic shell scripts that fire on every Write/Edit for instant feedback
 
 ## Install
 
 ```bash
-# Clone the toolkit
-git clone https://github.com/your-org/cab-killer.git
+# Install from GitHub
+claude plugins install https://github.com/bdfinst/cab-killer
 
-# Install into your project (symlinks agents, skills, hooks; merges hook config)
-cab-killer/install.sh /path/to/your-project
+# Or install from a local clone for development
+claude --plugin-dir /path/to/cab-killer
 ```
 
-The install script:
-- Symlinks `.claude/agents/`, `.claude/skills/`, and `.claude/hooks/` into your project
-- Merges cab-killer hooks into your existing `.claude/settings.json` (or creates one)
-- Appends a toolkit reference to your `CLAUDE.md`
-- Adds symlink paths to `.gitignore`
-
-Updates propagate automatically — just `git pull` the toolkit repo. To remove: `install.sh /path/to/project --uninstall`.
-
-Requires `jq` and `claude` (the script checks for both and fails with an error if missing).
+Updates propagate automatically — just `git pull` the plugin repo.
 
 ## Usage
 
@@ -126,7 +118,7 @@ The plugin detects the same issues as `complexity-review`, `structure-review`, a
 
 ```
 /eval-audit
-/eval-audit .claude/agents/js-fp-review.md
+/eval-audit agents/js-fp-review.md
 ```
 
 Checks all agents, skills, and hooks for structural compliance (output format, severity levels, numbered steps, etc.).
@@ -252,17 +244,54 @@ Correction prompts for `/apply-fixes`:
 
 ## Customization
 
+### Agents vs. skills
+
+**Agents** are review definitions — they describe *what* to look for in code. Each agent focuses on a single concern (security, naming, test quality, etc.), declares its model tier and context needs, and returns structured JSON with issues found. Agents don't take actions; they produce findings.
+
+**Skills** are workflows — they describe *what to do*. A skill orchestrates agents, applies fixes, generates reports, or scaffolds files. Skills have a role (orchestrator, worker, or implementation) that constrains their behavior.
+
+| Add an agent when... | Add a skill when... |
+|---|---|
+| You want to detect a new category of code issue | You want to automate a multi-step workflow |
+| The concern is reviewable from reading code | The task involves running tools, writing files, or coordinating agents |
+| Output is a list of findings with locations and fixes | Output is an action (files changed, report generated, commands run) |
+
+Examples: "Flag React hook violations" → agent. "Run all React-related agents and summarize" → skill.
+
 ### Add a new agent
 
-1. Create `.claude/agents/my-agent.md` with output format, severity levels, model tier, context needs, detection rules, and skip conditions
-2. Add eval fixtures in `evals/fixtures/` (2-3 pass, 2-3 fail) and reference solutions in `evals/expected/`
-3. Run `/eval-audit` to verify compliance
-4. Run `/eval-runner --agent my-agent` to validate accuracy
+```
+/add-agent "React hook violations" --tier mid --lang js,ts,jsx,tsx
+/add-agent "React hook violations" --name react-hook-review --dry
+```
+
+The `/add-agent` skill scaffolds a compliant agent file, checks for scope overlap with existing agents, runs `/eval-audit` to verify compliance, and adds the agent to CLAUDE.md.
+
+To add manually instead:
+1. Create `agents/my-agent.md` with YAML frontmatter (name, description, tools, model), output format, severity levels, model tier, context needs, detection rules, and skip conditions
+2. Run `/eval-audit agents/my-agent.md --fix` to verify and fix compliance
+
+After adding an agent (either way):
+1. Add eval fixtures in `evals/fixtures/` (2-3 pass, 2-3 fail) and reference solutions in `evals/expected/`
+2. Run `/eval-runner --agent my-agent` to validate accuracy
+
+### Add a new skill
+
+```
+/add-skill "Run linting checks across the project" --role worker
+/add-skill "Orchestrate dependency audits" --role orchestrator --dry
+```
+
+The `/add-skill` skill scaffolds a compliant SKILL.md with role-appropriate constraints and tools, runs `/eval-audit` to verify compliance, and adds the skill to CLAUDE.md.
+
+To add manually instead:
+1. Create `skills/my-skill/SKILL.md` with YAML frontmatter, role declaration, constraints section, argument parsing, and numbered steps
+2. Run `/eval-audit skills/my-skill/SKILL.md --fix` to verify and fix compliance
 
 ### Add a deterministic hook
 
-1. Create `.claude/hooks/my-check.sh` (must exit 0, read stdin for file path)
-2. Register in `.claude/settings.json` under `PostToolUse`
+1. Create `hooks/my-check.sh` (must exit 0, read stdin for file path)
+2. Register in `hooks/hooks.json` under `PostToolUse`
 
 See `docs/eval-system.md` for the full eval architecture.
 

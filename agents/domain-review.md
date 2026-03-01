@@ -1,3 +1,10 @@
+---
+name: domain-review
+description: Domain boundaries, abstraction leaks, business logic placement
+tools: Read, Grep, Glob
+model: opus
+---
+
 # Domain Review
 
 Output JSON:

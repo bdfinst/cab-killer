@@ -26,12 +26,12 @@ You have been invoked with the `/eval-audit` skill. Audit agents and skills for 
 Arguments: $ARGUMENTS
 
 - No argument or `--all`: audit everything
-- A specific file path (e.g., `.claude/agents/js-fp-review.md`): audit that file only
+- A specific file path (e.g., `agents/js-fp-review.md`): audit that file only
 - `--fix`: after generating the report, automatically apply fixes for FAIL/WARN items
 
 ### 2. Audit agents
 
-Read each file in `.claude/agents/*.md` and check:
+Read each file in `agents/*.md` and check:
 
 1. **Structured output format**: Does the agent specify a JSON output schema?
    - Review agents MUST include `status`, `issues`, and `summary` fields
@@ -77,7 +77,7 @@ Read each file in `.claude/agents/*.md` and check:
 
 ### 3. Audit skills
 
-Read each file in `.claude/skills/*/SKILL.md` and check:
+Read each file in `skills/*/SKILL.md` and check:
 
 1. **Role declaration**: Does the skill declare its role?
    - All skills MUST have a `Role:` line (orchestrator, worker, or implementation)
@@ -115,7 +115,7 @@ Read each file in `.claude/skills/*/SKILL.md` and check:
 
 ### 4. Audit hooks
 
-Read each file in `.claude/hooks/*.sh` and check:
+Read each file in `hooks/*.sh` and check:
 
 1. **Advisory behavior**: Does the hook exit 0?
    - Hooks MUST be advisory only (exit 0), never blocking

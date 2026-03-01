@@ -102,7 +102,7 @@ Files → Config → Enabled Agents → Results → Summary Table → Correction
 Files → Agent Definition → Review → Result
 ```
 
-1. Load agent definition from `.claude/agents/<name>.md`
+1. Load agent definition from `agents/<name>.md`
 2. Determine target files
 3. Run review following agent instructions
 4. Report findings
@@ -220,14 +220,14 @@ consecutive runs produce identical grades.
 
 ## Adding a New Agent
 
-1. Create `.claude/agents/<name>.md` with:
+1. Create `agents/<name>.md` with:
    - JSON output format (status, issues, summary)
    - Severity definitions (error, warning, suggestion)
    - Detection rules and thresholds (inline, not in a config file)
    - File scope (which file types the agent applies to)
    - Scope boundaries (what to ignore)
 
-2. Optionally add a hook in `.claude/hooks/<name>.sh` for deterministic checks
+2. Optionally add a hook in `hooks/<name>.sh` for deterministic checks
 
 3. Run `/eval-audit` to verify compliance
 

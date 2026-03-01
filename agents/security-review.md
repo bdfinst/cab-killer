@@ -1,3 +1,10 @@
+---
+name: security-review
+description: Injection, auth/authz, data exposure, security headers, crypto
+tools: Read, Grep, Glob
+model: opus
+---
+
 # Security Review
 
 Output JSON:
