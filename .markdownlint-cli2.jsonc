@@ -1,0 +1,9 @@
+{
+  "globs": ["**/*.md"],
+  "ignores": [
+    "evals/fixtures/te-verbose-claude.md",
+    "evals/fixtures/cs-complete-setup/**",
+    "evals/fixtures/cs-minimal-valid/**",
+    "evals/reports/**"
+  ]
+}

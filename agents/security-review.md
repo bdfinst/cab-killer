@@ -8,6 +8,7 @@ model: opus
 # Security Review
 
 Output JSON:
+
 ```json
 {"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
@@ -21,12 +22,14 @@ Context needs: full-file
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No source files with security-relevant patterns"}` when:
+
 - Target contains only static assets, images, or documentation
 - No code files that could contain security vulnerabilities
 
 ## Detect
 
 Injection:
+
 - SQL: unsanitized input in queries, missing parameterized queries
 - XSS: unescaped user input in HTML output
 - Command: user input in shell execution
@@ -34,6 +37,7 @@ Injection:
 - Path traversal: user input in file paths
 
 Auth/authz:
+
 - Weak password hashing (not bcrypt/argon2)
 - Insecure token generation
 - Missing session management
@@ -42,6 +46,7 @@ Auth/authz:
 - JWT issues (algorithm confusion, no expiration validation)
 
 Data exposure:
+
 - Hardcoded secrets/API keys/passwords
 - Sensitive data in logs
 - Unencrypted sensitive storage
@@ -49,6 +54,7 @@ Data exposure:
 - Verbose error messages exposing internals
 
 Config:
+
 - Missing security headers (CSP, HSTS, X-Frame-Options)
 - Permissive CORS
 - Debug enabled in production
@@ -56,12 +62,14 @@ Config:
 - Missing rate limiting
 
 Crypto:
+
 - MD5/SHA1 for security purposes
 - Insecure random generation
 - Hardcoded keys
 - Deprecated crypto functions
 
 Input:
+
 - Missing server-side validation
 - Unsafe file uploads
 - Insecure deserialization

@@ -1,6 +1,6 @@
 # Sample Code Review Report
 
-```
+```text
 # Code Review Summary
 
 | Agent              | Status | Issues |

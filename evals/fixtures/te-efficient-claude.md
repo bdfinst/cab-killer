@@ -9,7 +9,7 @@
 ## Commands
 
 | Action | Command |
-|--------|---------|
+| ------ | ------- |
 | Dev server | `npm run dev` |
 | Test | `npm test` |
 | Lint | `npm run lint` |
@@ -27,7 +27,7 @@
 ## File Layout
 
 | Directory | Contents |
-|-----------|----------|
+| --------- | -------- |
 | `src/controllers/` | Express route handlers |
 | `src/services/` | Business logic, returns `Result` |
 | `src/models/` | Prisma schema types |
@@ -44,7 +44,7 @@
 ## Error Handling
 
 | Layer | Strategy |
-|-------|----------|
+| ----- | -------- |
 | Controller | Catch `Result.err`, return HTTP status |
 | Service | Return `Result.err(AppError)` |
 | Middleware | Global error handler logs + 500 |

@@ -8,6 +8,7 @@ model: haiku
 # Claude Setup Review
 
 Output JSON:
+
 ```json
 {"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
@@ -21,12 +22,14 @@ Context needs: project-structure
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "Not a Claude Code project"}` when:
+
 - No CLAUDE.md, `.claude/` directory, or `.clinerules` file exists
 - Target is clearly not a Claude Code-enabled project
 
 ## Detect
 
 CLAUDE.md:
+
 - Missing or malformed
 - No project overview
 - No architecture documentation
@@ -36,16 +39,19 @@ CLAUDE.md:
 - Referenced paths don't exist
 
 Rules:
+
 - Missing .clinerules or .claude/rules/
 - Rules not actionable
 - Conflicting rules
 
 Skills:
+
 - Common workflows (commit, test, deploy) not defined as skills
 - Missing skill definitions
 - Skills reference wrong paths/commands
 
 Accuracy:
+
 - Documented structure doesn't match actual project
 - Commands don't work
 

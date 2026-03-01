@@ -1,32 +1,48 @@
 ---
 name: eval-runner
-description: Run eval fixtures against review agents and grade results. Use to validate agent accuracy and detect regressions.
+description: >-
+  Run eval fixtures against review agents and grade results.
+  Use to validate agent accuracy and detect regressions.
 argument-hint: "[--agent <name>] [--fixture <name>] [--trials <n>] [--verbose]"
 user-invocable: true
-allowed-tools: Read, Grep, Glob, Bash(readlink *, ls *, date *, mkdir *), Skill(review-agent *)
+allowed-tools: >-
+  Read, Grep, Glob, Bash(readlink *, ls *, date *, mkdir *),
+  Skill(review-agent *)
 ---
 
 # Eval Runner
 
-Role: orchestrator. This skill dispatches fixtures to agents and grades results — it does not review code itself.
+Role: orchestrator. This skill dispatches fixtures to agents and
+grades results — it does not review code itself.
 
-You have been invoked with the `/eval-runner` skill. Run review agents against eval fixtures and grade the results.
+You have been invoked with the `/eval-runner` skill. Run review agents
+against eval fixtures and grade the results.
 
 ## Orchestrator constraints
 
-1. **Do not review code yourself.** Delegate all reviews to `/review-agent`. Your job is dispatching and grading.
-2. **Grade deterministically.** Compare agent JSON output against expected JSON using exact criteria (status match, count ranges, keyword checks). Do not apply judgment.
-3. **Minimize context per agent.** Pass only the fixture file to the agent — not the expected results, not other fixtures, not prior transcripts.
-4. **Track results.** Save transcripts for saturation detection. Do not modify fixtures or expected files.
-5. **Be concise.** Output the report table and failure details. No narration of each fixture run — just the grades.
+1. **Do not review code yourself.** Delegate all reviews to
+   `/review-agent`. Your job is dispatching and grading.
+2. **Grade deterministically.** Compare agent JSON output against
+   expected JSON using exact criteria (status match, count ranges,
+   keyword checks). Do not apply judgment.
+3. **Minimize context per agent.** Pass only the fixture file to the
+   agent — not the expected results, not other fixtures, not prior
+   transcripts.
+4. **Track results.** Save transcripts for saturation detection. Do
+   not modify fixtures or expected files.
+5. **Be concise.** Output the report table and failure details. No
+   narration of each fixture run — just the grades.
 
 ## Parse Arguments
 
 Arguments: $ARGUMENTS
 
-- `--agent <name>`: Run only the named agent (e.g., `js-fp-review`)
-- `--fixture <name>`: Run only the named fixture (e.g., `fp-array-mutations.ts`)
-- `--trials <n>`: Run each fixture N times (default: 1). Enables pass@k scoring.
+- `--agent <name>`: Run only the named agent
+  (e.g., `js-fp-review`)
+- `--fixture <name>`: Run only the named fixture
+  (e.g., `fp-array-mutations.ts`)
+- `--trials <n>`: Run each fixture N times (default: 1). Enables
+  pass@k scoring.
 - `--verbose`: Show full agent output for each fixture
 - No arguments: run all agents against all applicable fixtures
 
@@ -34,63 +50,86 @@ Arguments: $ARGUMENTS
 
 ### 1. Resolve eval corpus
 
-Verify `evals/fixtures/` exists in the plugin root. If not, error: "Cannot find eval fixtures. Are you in the cab-killer plugin directory?"
+Verify `evals/fixtures/` exists in the plugin root. If not, error:
+"Cannot find eval fixtures. Are you in the cab-killer plugin
+directory?"
 
 ### 2. Load fixtures and expected results
 
-Read all files from `evals/fixtures/` and corresponding JSON from `evals/expected/`.
+Read all files from `evals/fixtures/` and corresponding JSON from
+`evals/expected/`.
 
 For each fixture:
-- Match the fixture stem (filename without extension) to its expected JSON
+
+- Match the fixture stem (filename without extension) to its
+  expected JSON
 - For directory fixtures (cs-*), the directory name is the stem
 - Parse `applicableAgents` to know which agents to run
 
-If `--agent` is specified, filter to fixtures where that agent is in `applicableAgents`.
+If `--agent` is specified, filter to fixtures where that agent is in
+`applicableAgents`.
 If `--fixture` is specified, filter to that fixture only.
 
 ### 3. Run agents against fixtures
 
 For each fixture/agent pair:
 
-1. Invoke `/review-agent <agent-name>` with the fixture file/directory as the target
-2. Parse the agent's JSON output to extract: `status`, `issues[]`, `summary`
-3. If running multiple trials (`--trials`), repeat and collect all results
+1. Invoke `/review-agent <agent-name>` with the fixture
+   file/directory as the target
+2. Parse the agent's JSON output to extract: `status`, `issues[]`,
+   `summary`
+3. If running multiple trials (`--trials`), repeat and collect all
+   results
 
 ### 4. Grade each result
 
 Compare agent output against expected JSON:
 
 **Status match:**
+
 - Agent status matches `expectedStatus` → PASS
-- Agent status is "skip" and fixture is not in `applicableAgents` → PASS (correct skip)
+- Agent status is "skip" and fixture is not in
+  `applicableAgents` → PASS (correct skip)
 - Mismatch → FAIL
 
 **Issue count:**
-- `issues.length` within `issueCount.min` to `issueCount.max` → PASS
+
+- `issues.length` within `issueCount.min` to
+  `issueCount.max` → PASS
 - Outside range → FAIL
 
 **Severity counts:**
+
 - For each severity in expected `severities`, count matching issues
 - Count within `min` to `max` → PASS
 - Outside range → FAIL
 
 **Keyword checks:**
-- For each keyword in `mustMention`: at least one issue message contains keyword (case-insensitive) → PASS
-- For each keyword in `mustNotMention`: no issue message contains keyword → PASS
+
+- For each keyword in `mustMention`: at least one issue message
+  contains keyword (case-insensitive) → PASS
+- For each keyword in `mustNotMention`: no issue message contains
+  keyword → PASS
 - Violation → FAIL
 
-Each check produces PASS/FAIL. Overall fixture grade: PASS only if all checks pass.
+Each check produces PASS/FAIL. Overall fixture grade: PASS only if
+all checks pass.
 
 ### 5. Compute pass@k (multi-trial)
 
 If `--trials` > 1:
+
 - pass@1: fraction of fixtures that passed on the first trial
-- pass@k: fraction of fixtures that passed on at least one of k trials
-- Consistency: fraction of fixtures with identical results across all trials
+- pass@k: fraction of fixtures that passed on at least one of k
+  trials
+- Consistency: fraction of fixtures with identical results across
+  all trials
 
 ### 6. Detect eval saturation
 
-Track the last 3 runs in `evals/transcripts/`. If the last 3 consecutive runs for an agent produce identical grades, flag as "saturated" — the expected ranges may need tightening.
+Track the last 3 runs in `evals/transcripts/`. If the last 3
+consecutive runs for an agent produce identical grades, flag as
+"saturated" — the expected ranges may need tightening.
 
 ### 7. Save transcript
 
@@ -111,13 +150,13 @@ Create `evals/transcripts/<timestamp>-<agent>.json`:
         "severities": "pass|fail",
         "mustMention": "pass|fail"
       },
-      "agentOutput": { "status": "...", "issues": [...], "summary": "..." }
+      "agentOutput": { "status": "...", "issues": [], "summary": "..." }
     }
   ],
   "summary": {
-    "total": N,
-    "passed": N,
-    "failed": N,
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
     "passRate": "N%",
     "passAtK": "N%",
     "saturated": ["agent-name"]
@@ -129,12 +168,12 @@ Create `evals/transcripts/<timestamp>-<agent>.json`:
 
 Save to `evals/reports/<timestamp>-report.md` and display:
 
-```
+```text
 # Eval Report — <timestamp>
 
 ## Summary
 | Metric | Value |
-|--------|-------|
+| --- | --- |
 | Fixtures | N |
 | Passed | N |
 | Failed | N |
@@ -144,13 +183,13 @@ Save to `evals/reports/<timestamp>-report.md` and display:
 
 ## Results by Agent
 | Agent | Fixtures | Passed | Failed | Rate |
-|-------|----------|--------|--------|------|
+| --- | --- | --- | --- | --- |
 | js-fp-review | 6 | 5 | 1 | 83% |
 | ... | | | | |
 
 ## Failures
 | Fixture | Agent | Check | Expected | Got |
-|---------|-------|-------|----------|-----|
+| --- | --- | --- | --- | --- |
 | fp-array-mutations.ts | js-fp-review | issueCount | 4-8 | 2 |
 | ... | | | | |
 
@@ -162,7 +201,7 @@ Save to `evals/reports/<timestamp>-report.md` and display:
 
 Copy and update this checklist:
 
-```
+```text
 - [ ] Toolkit root resolved
 - [ ] Fixtures loaded
 - [ ] Expected results loaded

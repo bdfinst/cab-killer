@@ -6,7 +6,7 @@ Use this prompt inside Claude Code at the root of your existing toolkit reposito
 
 ## The Prompt
 
-```
+```text
 I have an existing repository that distributes Claude Code skills, agents, and hooks
 using a shell script (install.sh) that symlinks directories into target projects.
 I want to convert this into a proper Claude Code plugin so it can be installed
@@ -43,7 +43,7 @@ Create `.claude-plugin/plugin.json` at the repo root with this structure:
 
 The required structure is:
 
-```
+```text
 my-plugin/
 ├── .claude-plugin/
 │   └── plugin.json          ← only the manifest goes here
@@ -151,7 +151,7 @@ claude plugin update <plugin-name>
 
 Ensure .gitignore includes:
 
-```
+```text
 node_modules/
 .DS_Store
 *.log
@@ -183,6 +183,7 @@ After making changes:
 4. List any issues you found but couldn't fix automatically
 5. Run `claude --plugin-dir .` to verify the plugin loads without errors
 
+```text
 ```
 
 ---

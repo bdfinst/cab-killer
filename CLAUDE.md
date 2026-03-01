@@ -1,11 +1,12 @@
 # cab-killer — Code Review Agent Toolkit
 
-A Claude Code plugin that adds multi-agent code review to any project. Agents, skills, and hooks that run inside Claude Code.
+A Claude Code plugin that adds multi-agent code review to any project.
+Agents, skills, and hooks that run inside Claude Code.
 
 ## Agents (`agents/`)
 
 | Agent | Focus | Model Tier |
-|-------|-------|------------|
+| ----- | ----- | ---------- |
 | test-review | Test quality, coverage, assertions | mid |
 | structure-review | SRP, DRY, coupling, organization | mid |
 | naming-review | Naming clarity, conventions, magic values | small |
@@ -22,8 +23,10 @@ A Claude Code plugin that adds multi-agent code review to any project. Agents, s
 
 - `/add-agent <description-or-url>` — Scaffold a new review agent with eval compliance
 - `/add-skill <description-or-url>` — Scaffold a new SKILL.md with eval compliance
-- `/apply-fixes <dir>` — Apply correction prompts with validation (or use [refactoring](https://github.com/elifiner/refactoring) plugin for structural fixes)
-- `/code-review` — Run all enabled agents with pre-flight gates, produce summary and correction prompts. Supports `--json`, `--force`.
+- `/apply-fixes <dir>` — Apply correction prompts with validation
+  (or use [refactoring](https://github.com/elifiner/refactoring) plugin)
+- `/code-review` — Run all enabled agents with pre-flight gates,
+  produce summary and correction prompts. Supports `--json`, `--force`.
 - `/eval-audit` — Audit agents/skills/hooks for eval system compliance
 - `/eval-runner` — Run eval fixtures against agents and grade results
 - `/review-agent <name>` — Run a single agent

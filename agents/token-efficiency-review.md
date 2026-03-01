@@ -8,6 +8,7 @@ model: haiku
 # Token Efficiency Review
 
 Output JSON:
+
 ```json
 {"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
@@ -21,13 +22,14 @@ Context needs: full-file
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or source files in target"}` when:
+
 - Target has no CLAUDE.md, rules, skills, or source code files
 - Target contains only binary or generated files
 
 ## Thresholds
 
 | Target | Limit |
-|--------|-------|
+| -------- | ------- |
 | CLAUDE.md | <5000 chars |
 | Code examples in CLAUDE.md | ≤10 |
 | Rules | ≤200 chars each |
@@ -41,6 +43,7 @@ Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or so
 ## Detect
 
 ### CLAUDE.md
+
 - Exceeds char limit
 - Excessive code examples
 - Duplicate/repetitive sections
@@ -49,22 +52,26 @@ Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or so
 - Multi-step workflows (should be skills)
 
 ### Rules
+
 - Verbose rules >200 chars
 - Duplicate/similar rules
 - Example-heavy rule files
 
 ### Skills
+
 - Missing skills for common workflows
 - Step-by-step procedures in CLAUDE.md (should be skills)
 - Verbose skill definitions
 
 ### Code
+
 - Long files (>500 lines)
 - Long functions (>50 lines)
 - Deep nesting (>5 levels)
 - Duplicate code blocks
 
 ### Documentation
+
 - Verbose JSDoc (>15 lines)
 - Tutorial comments in source (belong in docs/)
 - Commented-out code
@@ -74,6 +81,7 @@ Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or so
 CLAUDE.md, rules, and skills must follow LLM-native patterns. Flag violations:
 
 ### Anti-patterns (flag these)
+
 - Role preambles: "You are a...", "Act as...", "As an expert..."
 - Conversational filler: "Please note that...", "It's important to...", "Remember to..."
 - Redundant context: Repeating same information in different words
@@ -84,6 +92,7 @@ CLAUDE.md, rules, and skills must follow LLM-native patterns. Flag violations:
 - Examples without clear pattern (>3 examples for same concept)
 
 ### Required patterns (flag if missing)
+
 - Direct imperatives: "Use X", "Flag Y", "Return Z"
 - Structured output schemas at top of prompts
 - Lookup tables for mappings (status codes, severity levels)
@@ -91,6 +100,7 @@ CLAUDE.md, rules, and skills must follow LLM-native patterns. Flag violations:
 - Terse detection patterns
 
 ### Severity mapping
+
 - error: Role preambles, verbose explanations before action items
 - warning: Conversational filler, redundant context, deep nesting
 - suggestion: Minor verbosity, could be more terse

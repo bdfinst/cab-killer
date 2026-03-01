@@ -42,6 +42,7 @@
 ```
 
 The `tokenEstimate` field provides rough cost observability:
+
 - `totalInputFiles`: approximate character count of all input files passed to agents
 - `agentCount`: number of agents that ran (not skipped)
 - `contextStrategy`: whether diff-only, full-file, or a mix was used
@@ -72,7 +73,7 @@ Severity mapping: error->high, warning->medium, suggestion->low.
 Each agent declares a `Model tier` field that controls which model runs it:
 
 | Tier | Model | Use for |
-|------|-------|---------|
+| ------ | ------- | --------- |
 | `small` | Haiku | Pattern matching, thresholds, naming checks |
 | `mid` | Sonnet | Structural analysis, test quality, mutation detection |
 | `frontier` | Opus | Security analysis, domain modeling, semantic reasoning |
@@ -82,7 +83,7 @@ Each agent declares a `Model tier` field that controls which model runs it:
 Each agent declares a `Context needs` field that controls what input it receives:
 
 | Value | Input | When to use |
-|-------|-------|-------------|
+| ------- | ------- | ------------- |
 | `diff-only` | Git diff output only | Pattern-matching agents (naming, FP) |
 | `full-file` | Complete file contents | Agents needing function-level context |
 | `project-structure` | Full files + directory tree | Agents reasoning about architecture |

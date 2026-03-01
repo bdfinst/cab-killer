@@ -11,7 +11,7 @@ both against human review.
 
 ## Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────┐
 │              User Workflows                      │
 │  /code-review  /review-agent  /apply-fixes       │
@@ -33,7 +33,7 @@ both against human review.
 Fast, free, deterministic checks that run automatically via PostToolUse hooks:
 
 | Hook | What it checks |
-|------|---------------|
+| ---- | ------------- |
 | `js-fp-review.sh` | Array mutations, global state mutations, Object.assign, parameter mutations |
 | `token-efficiency-review.sh` | File length >500 lines, CLAUDE.md >5000 chars, function length >50 lines |
 | `eval-compliance-check.sh` | Agent/skill file structure, output format, severity levels |
@@ -46,7 +46,7 @@ issues cheaply before the model-based agents spend tokens on full analysis.
 Nine specialized agents that require LLM judgment:
 
 | Agent | Focus |
-|-------|-------|
+| ----- | ----- |
 | test-review | Test quality, coverage, assertion quality |
 | structure-review | SRP, DRY, coupling, organization |
 | naming-review | Naming clarity, conventions, magic values |
@@ -86,7 +86,7 @@ correction prompts are included.
 
 ### `/code-review` — Full review
 
-```
+```text
 Files → Config → Enabled Agents → Results → Summary Table → Correction Prompts
 ```
 
@@ -98,7 +98,7 @@ Files → Config → Enabled Agents → Results → Summary Table → Correction
 
 ### `/review-agent <name>` — Single agent
 
-```
+```text
 Files → Agent Definition → Review → Result
 ```
 
@@ -109,7 +109,7 @@ Files → Agent Definition → Review → Result
 
 ### `/apply-fixes <dir>` — Fix application
 
-```
+```text
 Prompts → Repo Rules → Apply Fix → Validate → Report
 ```
 
@@ -128,7 +128,7 @@ requires LLM judgment — for example, understanding whether a mutation is
 intentional based on surrounding context, or whether a long function is
 justified by its complexity.
 
-```
+```text
 Hook (instant, free)          Agent (thorough, costs tokens)
 ─────────────────────         ──────────────────────────────
 .push() detected              Is the push on a local copy?
@@ -143,6 +143,7 @@ Two mechanisms ensure new agents and skills follow patterns:
 ### `/eval-audit` skill (manual)
 
 Reads every agent, skill, and hook file and checks for:
+
 - Structured output format
 - Severity definitions
 - Detection rules and scope boundaries
@@ -155,6 +156,7 @@ Outputs a compliance report with PASS/WARN/FAIL per item.
 
 Fires on Write/Edit to agent or skill files. Provides real-time advisory
 warnings when:
+
 - A review agent is missing output format or severity definitions
 - A skill is missing numbered steps or argument parsing
 - A review-related skill has no report section
@@ -163,7 +165,7 @@ warnings when:
 
 The `evals/` directory contains a test corpus for validating agent accuracy:
 
-```
+```text
 evals/
 ├── fixtures/           # 46 code samples (checked in)
 │   ├── fp-*.ts         # js-fp-review (6 files)
@@ -207,7 +209,7 @@ severity ranges, and keyword checks.
 
 Run agents against fixtures and grade results:
 
-```
+```bash
 /eval-runner                                  # run all agents against all fixtures
 /eval-runner --agent js-fp-review             # run one agent
 /eval-runner --fixture fp-array-mutations.ts  # run one fixture
