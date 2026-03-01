@@ -20,8 +20,9 @@ A reusable `.claude/` toolkit that adds multi-agent code review to any project. 
 
 - `/code-review` — Run all enabled agents, produce summary and correction prompts
 - `/review-agent <name>` — Run a single agent
-- `/apply-fixes <dir>` — Apply correction prompts with validation
+- `/apply-fixes <dir>` — Apply correction prompts with validation (or use [refactoring](https://github.com/elifiner/refactoring) plugin for structural fixes)
 - `/eval-audit` — Audit agents/skills/hooks for eval system compliance
+- `/eval-runner` — Run eval fixtures against agents and grade results
 
 ## Hooks (PostToolUse, advisory)
 

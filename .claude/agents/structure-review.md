@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=clean, warn=minor issues, fail=architectural problems
 Severity: error=breaks maintainability, warning=tech debt, suggestion=improvement
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No multi-module code to analyze"}` when:
+- Target is a single configuration file or script
+- No module/class structure to evaluate
 
 ## Detect
 

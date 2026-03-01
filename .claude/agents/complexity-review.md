@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=manageable, warn=hotspots, fail=critical issues
 Severity: error=unmaintainable, warning=high complexity, suggestion=could simplify
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No code files in target"}` when:
+- Target contains only configuration, documentation, or data files
+- No files with functions/methods to analyze
 
 ## Thresholds
 

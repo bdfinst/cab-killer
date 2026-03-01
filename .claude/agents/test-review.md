@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=no issues, warn=minor, fail=critical
 Severity: error=compromises test effectiveness, warning=should fix, suggestion=improvement
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No test files in target"}` when:
+- No test files (`.test.*`, `.spec.*`, `__tests__/`) exist in the target
+- Target contains only non-test source files
 
 ## Detect
 

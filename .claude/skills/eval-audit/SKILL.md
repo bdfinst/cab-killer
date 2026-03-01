@@ -1,7 +1,10 @@
 ---
 name: eval-audit
-description: Audit code-review agents and skills for eval system compliance
+description: Audit code-review agents and skills for eval system compliance. Use when adding or modifying agents, skills, or hooks.
+argument-hint: "[file-path | --all] [--fix]"
+disable-model-invocation: true
 user-invocable: true
+allowed-tools: Read, Edit, Grep, Glob
 ---
 
 # Eval Audit
@@ -12,8 +15,11 @@ You have been invoked with the `/eval-audit` skill. Audit agents and skills for 
 
 ### 1. Parse arguments
 
+Arguments: $ARGUMENTS
+
 - No argument or `--all`: audit everything
 - A specific file path (e.g., `.claude/agents/js-fp-review.md`): audit that file only
+- `--fix`: after generating the report, automatically apply fixes for FAIL/WARN items
 
 ### 2. Audit agents
 
@@ -44,6 +50,12 @@ Read each file in `.claude/agents/*.md` and check:
    - Language-specific agents (e.g., js-fp-review) MUST declare their file scope
    - Language-agnostic agents (e.g., structure-review) may omit this
    - WARN if a language-specific agent has no file scope declaration
+
+7. **Skip support**: Does the agent define when to return `status: "skip"`?
+   - All review agents MUST have a `## Skip` section
+   - MUST describe conditions when the agent is inapplicable
+   - MUST show the skip JSON response format
+   - WARN if skip section is missing
 
 ### 3. Audit skills
 
@@ -87,11 +99,11 @@ Read each file in `.claude/hooks/*.sh` and check:
 # Eval Audit Report
 
 ## Agents
-| Agent                     | Output Format | Severity | Detection | Scope | Self-Describing | File Scope | Status |
-|---------------------------|---------------|----------|-----------|-------|-----------------|------------|--------|
-| test-review               | PASS          | PASS     | PASS      | PASS  | PASS            | N/A        | OK     |
-| js-fp-review              | PASS          | PASS     | PASS      | PASS  | PASS            | PASS       | OK     |
-| ...                       |               |          |           |       |        |
+| Agent                     | Output Format | Severity | Detection | Scope | Self-Describing | File Scope | Skip | Status |
+|---------------------------|---------------|----------|-----------|-------|-----------------|------------|------|--------|
+| test-review               | PASS          | PASS     | PASS      | PASS  | PASS            | N/A        | PASS | OK     |
+| js-fp-review              | PASS          | PASS     | PASS      | PASS  | PASS            | PASS       | PASS | OK     |
+| ...                       |               |          |           |       |                 |            |      |        |
 
 ## Skills
 | Skill          | Steps | Arguments | Output | Validation | Status |
@@ -114,10 +126,51 @@ Read each file in `.claude/hooks/*.sh` and check:
 - Action items: [list of things to fix]
 ```
 
-### 6. Offer fixes
+### 6. Apply fixes (when `--fix` is passed)
 
-If any FAILs are found, offer to fix them:
-- Missing output format: Add the standard JSON schema to the agent definition
-- Missing severity levels: Add error/warning/suggestion definitions
-- Missing steps: Add numbered steps to the skill
-- Missing validation: Add lint/build/test steps where appropriate
+If `--fix` was NOT passed, list action items and stop.
+
+If `--fix` WAS passed, automatically apply fixes for each FAIL/WARN item:
+
+**Agent fixes:**
+- Missing output format → insert after the `# <Agent Name>` heading:
+  ```
+  Output JSON:
+  \```json
+  {"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+  \```
+  ```
+- Missing severity definitions → insert after the output format:
+  ```
+  Severity: error=<agent-specific>, warning=<agent-specific>, suggestion=<agent-specific>
+  ```
+- Missing skip support → insert a `## Skip` section before `## Detect`:
+  ```
+  ## Skip
+
+  Return `{"status": "skip", "issues": [], "summary": "<reason>"}` when:
+  - <agent-specific inapplicability conditions>
+  ```
+- Missing scope boundaries → append `## Ignore` section at the end
+
+**Skill fixes:**
+- Missing numbered steps → restructure existing content under `## Steps` with `### 1.`, `### 2.`, etc.
+- Missing argument section → insert `## Parse Arguments` section after the skill heading
+
+**After each fix:**
+1. Read the file to confirm the fix was applied
+2. Re-run the specific check to verify it now passes
+3. Report: `FIXED: <agent/skill> — <what was fixed>`
+
+### 7. Fix summary
+
+If `--fix` was used, append a fix summary after the audit report:
+
+```
+## Fixes Applied
+- FIXED: <name> — Added output format
+- FIXED: <name> — Added skip section
+- SKIPPED: <name> — <reason fix could not be auto-applied>
+
+Re-run /eval-audit to verify all fixes.
+```

@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=clean model, warn=minor issues, fail=boundary violations
 Severity: error=leaky abstraction, warning=misplaced logic, suggestion=modeling improvement
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No domain model to analyze"}` when:
+- Target is infrastructure-only code (CI/CD, build scripts, configs)
+- No business logic or domain entities present
 
 ## Detect
 

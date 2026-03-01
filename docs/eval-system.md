@@ -62,7 +62,7 @@ Each agent outputs a structured result:
 ```json
 {
   "agentName": "<name>",
-  "status": "pass|warn|fail",
+  "status": "pass|warn|fail|skip",
   "issues": [
     {
       "severity": "error|warning|suggestion",
@@ -159,6 +159,65 @@ warnings when:
 - A skill is missing numbered steps or argument parsing
 - A review-related skill has no report section
 
+## Eval Fixtures
+
+The `evals/` directory contains a test corpus for validating agent accuracy:
+
+```
+evals/
+├── fixtures/           # 46 code samples (checked in)
+│   ├── fp-*.ts         # js-fp-review (6 files)
+│   ├── sec-*.ts        # security-review (5 files)
+│   ├── test-*.test.ts  # test-review (5 files)
+│   ├── cx-*.ts         # complexity-review (5 files)
+│   ├── nm-*.ts         # naming-review (5 files)
+│   ├── st-*.ts         # structure-review (5 files)
+│   ├── dm-*.ts         # domain-review (5 files)
+│   ├── te-*.md/.ts     # token-efficiency-review (5 files)
+│   └── cs-*/           # claude-setup-review (4 directories)
+├── expected/           # Reference solutions (checked in)
+│   └── <fixture-stem>.json
+├── transcripts/        # Auto-created by runner (gitignored)
+└── reports/            # Auto-created by runner (gitignored)
+```
+
+Each fixture is a small (20-80 line), focused code sample with a known-good or
+known-bad pattern. Reference solutions define expected status, issue count ranges,
+severity ranges, and keyword checks.
+
+### Reference solution schema
+
+```json
+{
+  "fixture": "fp-array-mutations.ts",
+  "description": "Array mutations js-fp-review should catch",
+  "applicableAgents": ["js-fp-review"],
+  "agents": {
+    "js-fp-review": {
+      "expectedStatus": "fail",
+      "issueCount": { "min": 3, "max": 6 },
+      "severities": { "error": { "min": 1, "max": 3 } },
+      "mustMention": ["push", "sort"]
+    }
+  }
+}
+```
+
+### `/eval-runner` skill
+
+Run agents against fixtures and grade results:
+
+```
+/eval-runner                                  # run all agents against all fixtures
+/eval-runner --agent js-fp-review             # run one agent
+/eval-runner --fixture fp-array-mutations.ts  # run one fixture
+/eval-runner --trials 3                       # multi-trial with pass@k scoring
+```
+
+The runner resolves the toolkit root via symlink (for installed projects) and
+saves transcripts for trend analysis. It detects eval saturation when 3
+consecutive runs produce identical grades.
+
 ## Adding a New Agent
 
 1. Create `.claude/agents/<name>.md` with:
@@ -171,3 +230,8 @@ warnings when:
 2. Optionally add a hook in `.claude/hooks/<name>.sh` for deterministic checks
 
 3. Run `/eval-audit` to verify compliance
+
+4. Add eval fixtures in `evals/fixtures/` (2-3 pass, 2-3 fail) and reference
+   solutions in `evals/expected/`
+
+5. Run `/eval-runner --agent <name>` to validate accuracy

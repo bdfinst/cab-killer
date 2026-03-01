@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=efficient, warn=optimization opportunities, fail=major waste
 Severity: error=critical waste, warning=significant, suggestion=minor
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or source files in target"}` when:
+- Target has no CLAUDE.md, rules, skills, or source code files
+- Target contains only binary or generated files
 
 ## Thresholds
 

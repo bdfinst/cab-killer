@@ -228,6 +228,7 @@ Available skills:
 - \`/review-agent <name>\` — Run a single agent (e.g., \`/review-agent security-review\`)
 - \`/apply-fixes <dir>\` — Apply correction prompts with validation
 - \`/eval-audit\` — Audit agents/skills/hooks for compliance
+- \`/eval-runner\` — Run eval fixtures against agents and grade results
 
 Hooks fire automatically on Write/Edit (advisory only, never block).
 
@@ -261,5 +262,9 @@ echo "  cd $TARGET_DIR"
 echo "  claude"
 echo "  /code-review            # run all review agents"
 echo "  /review-agent js-fp-review # run a single agent"
+echo "  /eval-runner            # validate agent accuracy"
+echo ""
+echo "Optional: install the refactoring plugin for structural fixes:"
+echo "  claude plugins install https://github.com/elifiner/refactoring"
 echo ""
 echo "To remove: $0 $TARGET_DIR --uninstall"

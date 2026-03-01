@@ -4,10 +4,16 @@ Scope: JavaScript and TypeScript files only (`.js`, `.ts`, `.jsx`, `.tsx`). Skip
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Severity: error=external state mutation, warning=local mutation, suggestion=style
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No JS/TS files in target"}` when:
+- No `.js`, `.ts`, `.jsx`, or `.tsx` files exist in the target
+- All target files are non-JavaScript/TypeScript
 
 ## Detect
 

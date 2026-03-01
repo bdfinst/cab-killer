@@ -70,6 +70,33 @@ The fix workflow:
 4. Runs validation (lint, build, tests) after each fix
 5. Reports results
 
+#### Alternative: refactoring plugin
+
+For structural fixes (long functions, duplication, deep nesting, unclear names), the [refactoring](https://github.com/elifiner/refactoring) Claude Code plugin provides an analysis-first, one-change-at-a-time workflow — better suited for complex structural changes than batch correction prompts.
+
+Install:
+
+```bash
+# From GitHub
+claude plugins install https://github.com/elifiner/refactoring
+
+# Or clone locally and install
+git clone https://github.com/elifiner/refactoring.git
+claude plugins install ./refactoring
+```
+
+Usage after `/code-review` identifies issues:
+
+```
+# Analyze code smells (phase 1)
+/refactoring analyze src/
+
+# Apply one refactoring at a time (phase 2)
+/refactoring apply
+```
+
+The plugin detects the same issues as `complexity-review`, `structure-review`, and `naming-review` but takes action directly rather than generating correction prompts.
+
 ### Audit eval compliance
 
 ```
@@ -78,6 +105,23 @@ The fix workflow:
 ```
 
 Checks all agents, skills, and hooks for structural compliance (output format, severity levels, numbered steps, etc.).
+
+Auto-fix mode applies structural fixes automatically:
+
+```
+/eval-audit --fix
+```
+
+### Run eval fixtures
+
+```
+/eval-runner
+/eval-runner --agent js-fp-review
+/eval-runner --fixture fp-array-mutations.ts
+/eval-runner --trials 3
+```
+
+Runs review agents against a corpus of 46 known-good/known-bad code samples and grades the results against reference solutions. Supports multi-trial pass@k scoring and saturation detection.
 
 ## Review Agents
 
@@ -127,7 +171,7 @@ Each agent produces:
 ```json
 {
   "agentName": "test-review",
-  "status": "pass|warn|fail",
+  "status": "pass|warn|fail|skip",
   "issues": [
     {
       "severity": "error|warning|suggestion",
@@ -157,9 +201,10 @@ Correction prompts for `/apply-fixes`:
 
 ### Add a new agent
 
-1. Create `.claude/agents/my-agent.md` with output format, severity levels, and detection rules
-2. Add a config entry in `config/review-config.json`
+1. Create `.claude/agents/my-agent.md` with output format, severity levels, detection rules, and skip conditions
+2. Add eval fixtures in `evals/fixtures/` (2-3 pass, 2-3 fail) and reference solutions in `evals/expected/`
 3. Run `/eval-audit` to verify compliance
+4. Run `/eval-runner --agent my-agent` to validate accuracy
 
 ### Add a deterministic hook
 

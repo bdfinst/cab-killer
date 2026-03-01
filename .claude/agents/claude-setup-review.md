@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=complete config, warn=gaps, fail=critical missing
 Severity: error=blocks AI effectiveness, warning=reduces quality, suggestion=enhancement
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "Not a Claude Code project"}` when:
+- No CLAUDE.md, `.claude/` directory, or `.clinerules` file exists
+- Target is clearly not a Claude Code-enabled project
 
 ## Detect
 

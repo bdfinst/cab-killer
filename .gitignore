@@ -33,3 +33,7 @@ yarn-error.log*
 *.log
 output/
 corrections/
+
+# Eval runner outputs (auto-generated)
+evals/transcripts/
+evals/reports/

@@ -2,11 +2,17 @@
 
 Output JSON:
 ```json
-{"status": "pass|warn|fail", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
+{"status": "pass|warn|fail|skip", "issues": [{"severity": "error|warning|suggestion", "file": "", "line": 0, "message": "", "suggestedFix": ""}], "summary": ""}
 ```
 
 Status: pass=no vulnerabilities, warn=concerns, fail=critical vulnerabilities
 Severity: error=exploitable, warning=potential weakness, suggestion=best practice
+
+## Skip
+
+Return `{"status": "skip", "issues": [], "summary": "No source files with security-relevant patterns"}` when:
+- Target contains only static assets, images, or documentation
+- No code files that could contain security vulnerabilities
 
 ## Detect
 

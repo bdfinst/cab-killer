@@ -1,7 +1,10 @@
 ---
 name: apply-fixes
-description: Apply correction prompts from a review run
+description: Apply correction prompts from a review run. Use after /code-review generates correction prompts in a corrections/ directory.
+argument-hint: "<corrections-dir> [--dry] [--skip-tests] [--skip-build] [--skip-lint]"
+disable-model-invocation: true
 user-invocable: true
+allowed-tools: Read, Edit, Grep, Glob, Bash(git diff *, npm run *, npx *, yarn *, pnpm *)
 ---
 
 # Apply Fixes
@@ -10,7 +13,9 @@ You have been invoked with the `/apply-fixes` skill. Load correction prompt JSON
 
 ## Parse Arguments
 
-Required: path to directory containing correction prompt JSON files
+Arguments: $ARGUMENTS
+
+Required: path to directory containing correction prompt JSON files (`$0`)
 
 Optional:
 - `--repo <path>`: Target repository path (default: current working directory)
@@ -48,6 +53,17 @@ Read all `.json` files from the specified directory, sorted alphabetically. Each
 
 ### 3. Apply each fix
 
+Copy this checklist and track progress:
+
+```
+- [ ] Correction prompts loaded
+- [ ] Fixes sorted by priority
+- [ ] All fixes applied
+- [ ] Validation complete
+- [ ] Summary generated
+- [ ] Applied prompts moved to completed/
+```
+
 For each prompt, sorted by priority (high first):
 
 1. Read the affected file(s)
@@ -81,3 +97,7 @@ Total: N | Applied: N | Failed: N | Validation Failed: N
 ```
 
 Move successfully applied prompt files to a `completed/` subdirectory.
+
+### 6. Suggest alternatives
+
+For structural issues (long functions, duplication, deep nesting, unclear names), mention the [refactoring](https://github.com/elifiner/refactoring) plugin as an alternative. It applies incremental, verified refactorings one at a time — better suited for complex structural changes than batch correction prompts. Install: `claude plugins install https://github.com/elifiner/refactoring`
