@@ -34,7 +34,7 @@ Fast, free, deterministic checks that run automatically via PostToolUse hooks:
 
 | Hook | What it checks |
 |------|---------------|
-| `fp-review.sh` | Array mutations, global state mutations, Object.assign, parameter mutations |
+| `js-fp-review.sh` | Array mutations, global state mutations, Object.assign, parameter mutations |
 | `token-efficiency-review.sh` | File length >500 lines, CLAUDE.md >5000 chars, function length >50 lines |
 | `eval-compliance-check.sh` | Agent/skill file structure, output format, severity levels |
 
@@ -55,7 +55,7 @@ Nine specialized agents that require LLM judgment:
 | claude-setup-review | CLAUDE.md completeness and accuracy |
 | token-efficiency-review | Token optimization (full analysis beyond hook) |
 | security-review | Injection, auth, data exposure, crypto |
-| fp-review | Mutation detection (full analysis beyond hook) |
+| js-fp-review | Mutation detection (full analysis beyond hook) |
 
 Each agent outputs a structured result:
 
@@ -121,9 +121,9 @@ Prompts → Repo Rules → Apply Fix → Validate → Report
 
 ## How Hooks and Agents Complement Each Other
 
-The hooks (`fp-review.sh`, `token-efficiency-review.sh`) provide instant
+The hooks (`js-fp-review.sh`, `token-efficiency-review.sh`) provide instant
 feedback on the most common, mechanically detectable issues. The corresponding
-agents (`fp-review`, `token-efficiency-review`) provide deeper analysis that
+agents (`js-fp-review`, `token-efficiency-review`) provide deeper analysis that
 requires LLM judgment — for example, understanding whether a mutation is
 intentional based on surrounding context, or whether a long function is
 justified by its complexity.

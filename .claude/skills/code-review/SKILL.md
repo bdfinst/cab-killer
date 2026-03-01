@@ -35,7 +35,7 @@ If a `review-config.json` exists in the project root, read it. It can disable sp
 
 For each enabled agent, read its definition from `.claude/agents/<name>.md` and review the target files following the agent's instructions.
 
-**File scope**: Each agent definition declares its own file scope (e.g., fp-review says "JavaScript and TypeScript files only"). Respect these scope declarations — only pass matching files, and skip the agent entirely if no target files match.
+**File scope**: Each agent definition declares its own file scope (e.g., js-fp-review says "JavaScript and TypeScript files only"). Respect these scope declarations — only pass matching files, and skip the agent entirely if no target files match.
 
 Produce a JSON result per agent:
 

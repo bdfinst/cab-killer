@@ -160,7 +160,7 @@ done
 # ------------------------------------------------------------------
 SETTINGS="$CLAUDE_DIR/settings.json"
 CAB_KILLER_HOOKS='[
-  {"type":"command","command":".claude/hooks/fp-review.sh"},
+  {"type":"command","command":".claude/hooks/js-fp-review.sh"},
   {"type":"command","command":".claude/hooks/token-efficiency-review.sh"},
   {"type":"command","command":".claude/hooks/eval-compliance-check.sh"}
 ]'
@@ -171,7 +171,7 @@ if [ -f "$SETTINGS" ]; then
     [.hooks.PostToolUse[]?.hooks[]?.command // empty] | join(",")
   ' "$SETTINGS" 2>/dev/null || echo "")
 
-  if echo "$EXISTING_HOOKS" | grep -q "fp-review.sh"; then
+  if echo "$EXISTING_HOOKS" | grep -q "js-fp-review.sh"; then
     info "settings.json already has cab-killer hooks (up to date)"
   else
     # Merge: find existing Edit|Write matcher or create one
@@ -260,6 +260,6 @@ echo "Next steps:"
 echo "  cd $TARGET_DIR"
 echo "  claude"
 echo "  /code-review            # run all review agents"
-echo "  /review-agent fp-review # run a single agent"
+echo "  /review-agent js-fp-review # run a single agent"
 echo ""
 echo "To remove: $0 $TARGET_DIR --uninstall"

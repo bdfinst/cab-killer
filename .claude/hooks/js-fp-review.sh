@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# FP Review Hook — PostToolUse advisory for Write/Edit on JS/TS files
+# JS FP Review Hook — PostToolUse advisory for Write/Edit on JS/TS files
 # Detects common mutation patterns and warns without blocking.
-# Full nuanced analysis is handled by the fp-review agent.
+# Full nuanced analysis is handled by the js-fp-review agent.
 
 set -euo pipefail
 

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/fp-review.sh"
+            "command": ".claude/hooks/js-fp-review.sh"
           },
           {
             "type": "command",

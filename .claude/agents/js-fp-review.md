@@ -1,4 +1,4 @@
-# FP Review
+# JS FP Review
 
 Scope: JavaScript and TypeScript files only (`.js`, `.ts`, `.jsx`, `.tsx`). Skip this agent entirely if the project has no JS/TS files.
 
@@ -44,3 +44,7 @@ Impure patterns:
 - Functions modifying parameters
 - Functions depending on/modifying external state
 - `++`/`--` outside loop counters
+
+## Ignore
+
+Code structure, naming, tests, domain modeling, security (handled by other agents)

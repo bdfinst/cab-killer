@@ -10,7 +10,7 @@ You have been invoked with the `/review-agent` skill. Run a single named review 
 
 ## Parse Arguments
 
-Required: agent name (e.g., `test-review`, `fp-review`, `security-review`)
+Required: agent name (e.g., `test-review`, `js-fp-review`, `security-review`)
 
 Optional:
 - `--changed`: Review only uncommitted changes

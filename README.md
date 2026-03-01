@@ -50,7 +50,7 @@ Options:
 ```
 /review-agent test-review
 /review-agent security-review --changed
-/review-agent fp-review --since main
+/review-agent js-fp-review --since main
 ```
 
 ### Apply fixes
@@ -74,7 +74,7 @@ The fix workflow:
 
 ```
 /eval-audit
-/eval-audit .claude/agents/fp-review.md
+/eval-audit .claude/agents/js-fp-review.md
 ```
 
 Checks all agents, skills, and hooks for structural compliance (output format, severity levels, numbered steps, etc.).
@@ -91,7 +91,7 @@ Checks all agents, skills, and hooks for structural compliance (output format, s
 | `claude-setup-review` | CLAUDE.md completeness, rules, skills, path accuracy |
 | `token-efficiency-review` | CLAUDE.md length, file/function size, nesting, duplicate code, LLM anti-patterns |
 | `security-review` | Injection, auth/authz, data exposure, security headers, crypto, input validation |
-| `fp-review` | let→const, array mutations, parameter mutations, global state, Object.assign |
+| `js-fp-review` | let→const, array mutations, parameter mutations, global state, Object.assign |
 
 ## Hooks
 
@@ -99,20 +99,20 @@ Hooks fire automatically on every `Write` or `Edit` via PostToolUse. They are ad
 
 | Hook | Triggers on | What it checks |
 |------|------------|----------------|
-| `fp-review.sh` | JS/TS files | `.push()`, `.sort()`, `Object.assign(obj, ...)`, global mutations |
+| `js-fp-review.sh` | JS/TS files | `.push()`, `.sort()`, `Object.assign(obj, ...)`, global mutations |
 | `token-efficiency-review.sh` | All source files | File >500 lines, CLAUDE.md >5000 chars, functions >50 lines |
 | `eval-compliance-check.sh` | Agent/skill files | Output format, severity levels, numbered steps |
 
 ## Configuration
 
-All agents are enabled by default — no config file required. Each agent declares its own thresholds and file scope in its definition (e.g., fp-review scopes itself to JS/TS files).
+All agents are enabled by default — no config file required. Each agent declares its own thresholds and file scope in its definition (e.g., js-fp-review scopes itself to JS/TS files).
 
 To disable specific agents in your project, create a `review-config.json` in your project root:
 
 ```json
 {
   "agents": {
-    "fp-review": { "enabled": false },
+    "js-fp-review": { "enabled": false },
     "domain-review": { "enabled": false }
   }
 }
