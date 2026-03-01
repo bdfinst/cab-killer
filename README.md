@@ -30,7 +30,7 @@ The install script:
 
 Updates propagate automatically — just `git pull` the toolkit repo. To remove: `install.sh /path/to/project --uninstall`.
 
-Requires `jq` for settings.json merging.
+Requires `jq` and `claude` (the script checks for both and fails with an error if missing).
 
 ## Usage
 

@@ -27,6 +27,19 @@ CLAUDE_DIR="$TARGET_DIR/.claude"
 
 DIRS=("agents" "skills" "hooks")
 
+# Required tools
+MISSING=()
+command -v jq &>/dev/null    || MISSING+=("jq (https://jqlang.github.io/jq/)")
+command -v claude &>/dev/null || MISSING+=("claude (https://docs.anthropic.com/en/docs/claude-code)")
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+  echo "Error: missing required tools:"
+  for tool in "${MISSING[@]}"; do
+    echo "  - $tool"
+  done
+  exit 1
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -54,7 +67,7 @@ if $UNINSTALL; then
 
   # Remove cab-killer hooks from settings.json
   SETTINGS="$CLAUDE_DIR/settings.json"
-  if [ -f "$SETTINGS" ] && command -v jq &>/dev/null; then
+  if [ -f "$SETTINGS" ]; then
     # Remove hooks whose command starts with .claude/hooks/ (cab-killer hooks)
     UPDATED=$(jq '
       if .hooks.PostToolUse then
@@ -79,8 +92,6 @@ if $UNINSTALL; then
       echo "$UPDATED" > "$SETTINGS"
       info "Removed cab-killer hooks from settings.json"
     fi
-  else
-    warn "jq not found — remove cab-killer hooks from $SETTINGS manually"
   fi
 
   # Remove .claude dir if empty
@@ -154,51 +165,45 @@ CAB_KILLER_HOOKS='[
   {"type":"command","command":".claude/hooks/eval-compliance-check.sh"}
 ]'
 
-if ! command -v jq &>/dev/null; then
-  warn "jq not found — cannot merge settings.json automatically"
-  warn "Add the following hooks to $SETTINGS manually:"
-  echo "$CAB_KILLER_HOOKS"
-else
-  if [ -f "$SETTINGS" ]; then
-    # Check if our hooks are already present
-    EXISTING_HOOKS=$(jq -r '
-      [.hooks.PostToolUse[]?.hooks[]?.command // empty] | join(",")
-    ' "$SETTINGS" 2>/dev/null || echo "")
+if [ -f "$SETTINGS" ]; then
+  # Check if our hooks are already present
+  EXISTING_HOOKS=$(jq -r '
+    [.hooks.PostToolUse[]?.hooks[]?.command // empty] | join(",")
+  ' "$SETTINGS" 2>/dev/null || echo "")
 
-    if echo "$EXISTING_HOOKS" | grep -q "fp-review.sh"; then
-      info "settings.json already has cab-killer hooks (up to date)"
-    else
-      # Merge: find existing Edit|Write matcher or create one
-      UPDATED=$(jq --argjson new_hooks "$CAB_KILLER_HOOKS" '
-        if .hooks == null then .hooks = {} else . end |
-        if .hooks.PostToolUse == null then .hooks.PostToolUse = [] else . end |
-
-        # Find an existing Edit|Write matcher
-        (.hooks.PostToolUse | map(.matcher) | index("Edit|Write")) as $idx |
-
-        if $idx != null then
-          # Append our hooks to the existing matcher
-          .hooks.PostToolUse[$idx].hooks += $new_hooks
-        else
-          # Create a new matcher entry
-          .hooks.PostToolUse += [{"matcher": "Edit|Write", "hooks": $new_hooks}]
-        end
-      ' "$SETTINGS")
-
-      echo "$UPDATED" | jq '.' > "$SETTINGS"
-      info "Merged cab-killer hooks into existing settings.json"
-    fi
+  if echo "$EXISTING_HOOKS" | grep -q "fp-review.sh"; then
+    info "settings.json already has cab-killer hooks (up to date)"
   else
-    # Create new settings.json
-    jq -n --argjson hooks "$CAB_KILLER_HOOKS" '{
-      hooks: {
-        PostToolUse: [
-          {matcher: "Edit|Write", hooks: $hooks}
-        ]
-      }
-    }' > "$SETTINGS"
-    info "Created settings.json with cab-killer hooks"
+    # Merge: find existing Edit|Write matcher or create one
+    UPDATED=$(jq --argjson new_hooks "$CAB_KILLER_HOOKS" '
+      if .hooks == null then .hooks = {} else . end |
+      if .hooks.PostToolUse == null then .hooks.PostToolUse = [] else . end |
+
+      # Find an existing Edit|Write matcher
+      (.hooks.PostToolUse | map(.matcher) | index("Edit|Write")) as $idx |
+
+      if $idx != null then
+        # Append our hooks to the existing matcher
+        .hooks.PostToolUse[$idx].hooks += $new_hooks
+      else
+        # Create a new matcher entry
+        .hooks.PostToolUse += [{"matcher": "Edit|Write", "hooks": $new_hooks}]
+      end
+    ' "$SETTINGS")
+
+    echo "$UPDATED" | jq '.' > "$SETTINGS"
+    info "Merged cab-killer hooks into existing settings.json"
   fi
+else
+  # Create new settings.json
+  jq -n --argjson hooks "$CAB_KILLER_HOOKS" '{
+    hooks: {
+      PostToolUse: [
+        {matcher: "Edit|Write", hooks: $hooks}
+      ]
+    }
+  }' > "$SETTINGS"
+  info "Created settings.json with cab-killer hooks"
 fi
 
 # ------------------------------------------------------------------
