@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=manageable, warn=hotspots, fail=critical issues
 Severity: error=unmaintainable, warning=high complexity, suggestion=could simplify
 
+Model tier: small
+Context needs: full-file
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No code files in target"}` when:

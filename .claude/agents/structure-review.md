@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=clean, warn=minor issues, fail=architectural problems
 Severity: error=breaks maintainability, warning=tech debt, suggestion=improvement
 
+Model tier: mid
+Context needs: full-file
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No multi-module code to analyze"}` when:

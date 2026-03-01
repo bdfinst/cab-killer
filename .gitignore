@@ -37,3 +37,6 @@ corrections/
 # Eval runner outputs (auto-generated)
 evals/transcripts/
 evals/reports/
+
+# Review summaries (session-specific, auto-generated)
+.claude/review-summaries/

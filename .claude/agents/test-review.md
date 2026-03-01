@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=no issues, warn=minor, fail=critical
 Severity: error=compromises test effectiveness, warning=should fix, suggestion=improvement
 
+Model tier: mid
+Context needs: full-file
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No test files in target"}` when:

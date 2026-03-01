@@ -71,6 +71,16 @@ if [ "$FILE_TYPE" = "agent" ]; then
     warn "$AGENT_NAME: Missing ## Skip section (must define when agent is inapplicable)."
   fi
 
+  # 8. Model tier (WARN)
+  if ! echo "$CONTENT" | grep -qiE 'model tier:\s*(small|mid|frontier)'; then
+    warn "$AGENT_NAME: Missing 'Model tier' field (must be small, mid, or frontier)."
+  fi
+
+  # 9. Context needs (WARN)
+  if ! echo "$CONTENT" | grep -qiE 'context needs:\s*(diff-only|full-file|project-structure)'; then
+    warn "$AGENT_NAME: Missing 'Context needs' field (must be diff-only, full-file, or project-structure)."
+  fi
+
   # 6. File scope for language-specific agents (WARN)
   if echo "$CONTENT" | grep -qiE 'javascript\|typescript\|python\|ruby\|go\|rust\|java'; then
     if ! echo "$CONTENT" | grep -qiE 'scope:|\.js\b|\.ts\b|\.py\b|\.rb\b|\.go\b|\.rs\b|\.java\b|files only'; then

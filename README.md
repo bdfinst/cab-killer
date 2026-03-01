@@ -2,15 +2,18 @@
 
 A multi-agent code review toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Specialized review agents, automation skills, and deterministic hooks — all packaged as a portable `.claude/` directory you copy into any project.
 
+Architecture informed by the [Minimum CD Agentic CD](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) and [Pipeline Reference Architecture](https://migration.minimumcd.org/docs/pipeline-reference-architecture/) patterns: fail fast/fail cheap gate sequencing, separation of concerns per agent, model tiering for cost control, and context minimization for token efficiency.
+
 ## Why
 
-Coding agents write code fast but skip quality checks. cab-killer adds automated review for test quality, structure, naming, domain boundaries, complexity, security, functional purity, token efficiency, and Claude setup — without leaving your Claude Code workflow.
+Coding agents write code fast but skip quality checks. cab-killer adds automated review for test quality, structure, naming, domain boundaries, complexity, security, functional purity, concurrency, performance, token efficiency, and Claude setup — without leaving your Claude Code workflow.
 
 ## How It Works
 
-1. **Agents** (`.claude/agents/*.md`) — LLM-native prompt definitions that each focus on one aspect of code quality
-2. **Skills** (`.claude/skills/`) — Orchestration workflows invoked via slash commands
-3. **Hooks** (`.claude/hooks/`) — Deterministic shell scripts that fire on every Write/Edit for instant feedback
+1. **Pre-flight gates** — Deterministic checks (lint, type-check, secret scan) run first. Fail fast before spending tokens on AI agents.
+2. **Agents** (`.claude/agents/*.md`) — LLM-native prompt definitions that each focus on one aspect of code quality. Each declares its own model tier and context needs.
+3. **Skills** (`.claude/skills/`) — Orchestration workflows invoked via slash commands
+4. **Hooks** (`.claude/hooks/`) — Deterministic shell scripts that fire on every Write/Edit for instant feedback
 
 ## Install
 
@@ -44,6 +47,19 @@ Options:
 - `/code-review --changed` — review only uncommitted changes
 - `/code-review --since main` — review files changed since a branch
 - `/code-review --agent test-review` — run a single agent
+- `/code-review --json` — output aggregated JSON (for CI integration)
+- `/code-review --force` — skip pre-flight gates
+
+### Pre-flight gates
+
+Before agents run, `/code-review` executes deterministic checks in sequence:
+
+1. **Lint** — eslint (or project lint command)
+2. **Type check** — tsc --noEmit (if tsconfig.json exists)
+3. **Secret scan** — grep for common secret patterns
+4. **Pipeline-red check** — warn if CI is failing on the current branch
+
+If any gate fails, agents do not run. Use `--force` to override.
 
 ### Run a single agent
 
@@ -52,6 +68,15 @@ Options:
 /review-agent security-review --changed
 /review-agent js-fp-review --since main
 ```
+
+### Generate review summary
+
+```
+/review-summary
+/review-summary --from review-output.json
+```
+
+Writes a compact (<150 word) session summary to `.claude/review-summaries/` for cross-session context continuity.
 
 ### Apply fixes
 
@@ -121,21 +146,25 @@ Auto-fix mode applies structural fixes automatically:
 /eval-runner --trials 3
 ```
 
-Runs review agents against a corpus of 46 known-good/known-bad code samples and grades the results against reference solutions. Supports multi-trial pass@k scoring and saturation detection.
+Runs review agents against a corpus of known-good/known-bad code samples and grades the results against reference solutions. Supports multi-trial pass@k scoring and saturation detection.
 
 ## Review Agents
 
-| Agent | What it checks |
-|-------|---------------|
-| `test-review` | Coverage gaps, assertion quality, test hygiene, missing edge cases |
-| `structure-review` | SRP violations, DRY, coupling, nesting depth, file organization |
-| `naming-review` | Intent-revealing names, boolean prefixes, magic values, consistency |
-| `domain-review` | Business logic placement, abstraction leaks, entity/DTO confusion, boundaries |
-| `complexity-review` | Function size (<20 lines), cyclomatic complexity (<10), nesting (<4), parameters (<5) |
-| `claude-setup-review` | CLAUDE.md completeness, rules, skills, path accuracy |
-| `token-efficiency-review` | CLAUDE.md length, file/function size, nesting, duplicate code, LLM anti-patterns |
-| `security-review` | Injection, auth/authz, data exposure, security headers, crypto, input validation |
-| `js-fp-review` | let→const, array mutations, parameter mutations, global state, Object.assign |
+Each agent declares a **model tier** (small/mid/frontier) that controls which model runs it, and **context needs** (diff-only/full-file/project-structure) that controls what input it receives. This follows the [Minimum CD agent configuration](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) principle: match model tier to task complexity.
+
+| Agent | What it checks | Model Tier | Context Needs |
+|-------|---------------|------------|---------------|
+| `test-review` | Coverage gaps, assertion quality, test hygiene, missing edge cases | mid | full-file |
+| `structure-review` | SRP violations, DRY, coupling, nesting depth, file organization | mid | full-file |
+| `naming-review` | Intent-revealing names, boolean prefixes, magic values, consistency | small | diff-only |
+| `domain-review` | Business logic placement, abstraction leaks, entity/DTO confusion, boundaries | frontier | project-structure |
+| `complexity-review` | Function size (<20 lines), cyclomatic complexity (<10), nesting (<4), parameters (<5) | small | full-file |
+| `claude-setup-review` | CLAUDE.md completeness, rules, skills, path accuracy | small | project-structure |
+| `token-efficiency-review` | CLAUDE.md length, file/function size, nesting, duplicate code, LLM anti-patterns | small | full-file |
+| `security-review` | Injection, auth/authz, data exposure, security headers, crypto, input validation | frontier | full-file |
+| `js-fp-review` | let->const, array mutations, parameter mutations, global state, Object.assign | mid | diff-only |
+| `concurrency-review` | Race conditions, async pitfalls, idempotency, shared state safety | mid | full-file |
+| `performance-review` | Resource leaks, N+1 queries, unbounded growth, timeouts, algorithmic issues | small | full-file |
 
 ## Hooks
 
@@ -146,21 +175,25 @@ Hooks fire automatically on every `Write` or `Edit` via PostToolUse. They are ad
 | `js-fp-review.sh` | JS/TS files | `.push()`, `.sort()`, `Object.assign(obj, ...)`, global mutations |
 | `token-efficiency-review.sh` | All source files | File >500 lines, CLAUDE.md >5000 chars, functions >50 lines |
 | `eval-compliance-check.sh` | Agent/skill files | Output format, severity levels, numbered steps |
+| `pre-commit-review.sh` | Pre-commit (opt-in) | Warns when `blockOnFail` is enabled and source files are staged |
 
 ## Configuration
 
-All agents are enabled by default — no config file required. Each agent declares its own thresholds and file scope in its definition (e.g., js-fp-review scopes itself to JS/TS files).
+All agents are enabled by default — no config file required. Each agent declares its own thresholds, file scope, model tier, and context needs in its definition.
 
-To disable specific agents in your project, create a `review-config.json` in your project root:
+To disable specific agents or enable commit blocking in your project, create a `review-config.json` in your project root:
 
 ```json
 {
   "agents": {
     "js-fp-review": { "enabled": false },
     "domain-review": { "enabled": false }
-  }
+  },
+  "blockOnFail": false
 }
 ```
+
+Setting `"blockOnFail": true` activates the pre-commit hook that warns when review agents report fail status on staged files.
 
 This file is project-local and is not part of the toolkit.
 
@@ -172,6 +205,7 @@ Each agent produces:
 {
   "agentName": "test-review",
   "status": "pass|warn|fail|skip",
+  "modelTier": "mid",
   "issues": [
     {
       "severity": "error|warning|suggestion",
@@ -182,6 +216,25 @@ Each agent produces:
     }
   ],
   "summary": "Found 1 issue with test coverage"
+}
+```
+
+Aggregated JSON output (`/code-review --json`):
+
+```json
+{
+  "overall": "warn",
+  "timestamp": "2026-03-01T12:00:00Z",
+  "targetFiles": 42,
+  "preFlightPassed": true,
+  "agents": [...],
+  "totals": {"errors": 0, "warnings": 2, "suggestions": 1},
+  "tokenEstimate": {
+    "totalInputFiles": 15000,
+    "agentCount": 11,
+    "contextStrategy": "mixed"
+  },
+  "summary": "WARN (9 agents passed, 2 warned, 0 failed). 3 total issues."
 }
 ```
 
@@ -201,7 +254,7 @@ Correction prompts for `/apply-fixes`:
 
 ### Add a new agent
 
-1. Create `.claude/agents/my-agent.md` with output format, severity levels, detection rules, and skip conditions
+1. Create `.claude/agents/my-agent.md` with output format, severity levels, model tier, context needs, detection rules, and skip conditions
 2. Add eval fixtures in `evals/fixtures/` (2-3 pass, 2-3 fail) and reference solutions in `evals/expected/`
 3. Run `/eval-audit` to verify compliance
 4. Run `/eval-runner --agent my-agent` to validate accuracy
@@ -212,6 +265,13 @@ Correction prompts for `/apply-fixes`:
 2. Register in `.claude/settings.json` under `PostToolUse`
 
 See `docs/eval-system.md` for the full eval architecture.
+
+## Architecture References
+
+This toolkit's design is informed by:
+
+- [Minimum CD — Agentic CD Agent Configuration](https://migration.minimumcd.org/docs/agentic-cd/agent-configuration/) — separation of concerns, model tiering, context assembly, session summaries
+- [Minimum CD — Pipeline Reference Architecture](https://migration.minimumcd.org/docs/pipeline-reference-architecture/) — fail fast/fail cheap gate sequencing, pre-feature baselines, quality gate layering
 
 ## License
 

@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=no vulnerabilities, warn=concerns, fail=critical vulnerabilities
 Severity: error=exploitable, warning=potential weakness, suggestion=best practice
 
+Model tier: frontier
+Context needs: full-file
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No source files with security-relevant patterns"}` when:

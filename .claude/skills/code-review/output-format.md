@@ -6,6 +6,7 @@
 {
   "agentName": "structure-review",
   "status": "pass|warn|fail|skip",
+  "modelTier": "mid",
   "issues": [
     {
       "severity": "error|warning|suggestion",
@@ -18,6 +19,32 @@
   "summary": "2 issues found: 1 error, 1 warning"
 }
 ```
+
+## Aggregated JSON result (`--json` flag)
+
+```json
+{
+  "overall": "pass|warn|fail",
+  "timestamp": "2026-03-01T12:00:00Z",
+  "targetFiles": 42,
+  "preFlightPassed": true,
+  "agents": [
+    {"agentName": "test-review", "status": "pass", "modelTier": "mid", "issues": [], "summary": "..."}
+  ],
+  "totals": {"errors": 0, "warnings": 2, "suggestions": 1},
+  "tokenEstimate": {
+    "totalInputFiles": 15000,
+    "agentCount": 11,
+    "contextStrategy": "diff-only|full-file|mixed"
+  },
+  "summary": "WARN (N agents passed, N warned, N failed). N total issues."
+}
+```
+
+The `tokenEstimate` field provides rough cost observability:
+- `totalInputFiles`: approximate character count of all input files passed to agents
+- `agentCount`: number of agents that ran (not skipped)
+- `contextStrategy`: whether diff-only, full-file, or a mix was used
 
 ## Correction prompt JSON
 
@@ -39,3 +66,23 @@ Severity mapping: error->high, warning->medium, suggestion->low.
 - **warn**: Issues found, none are errors
 - **fail**: At least one error-severity issue
 - **skip**: Agent is inapplicable to the target (e.g., no JS/TS files for js-fp-review)
+
+## Model tier values
+
+Each agent declares a `Model tier` field that controls which model runs it:
+
+| Tier | Model | Use for |
+|------|-------|---------|
+| `small` | Haiku | Pattern matching, thresholds, naming checks |
+| `mid` | Sonnet | Structural analysis, test quality, mutation detection |
+| `frontier` | Opus | Security analysis, domain modeling, semantic reasoning |
+
+## Context needs values
+
+Each agent declares a `Context needs` field that controls what input it receives:
+
+| Value | Input | When to use |
+|-------|-------|-------------|
+| `diff-only` | Git diff output only | Pattern-matching agents (naming, FP) |
+| `full-file` | Complete file contents | Agents needing function-level context |
+| `project-structure` | Full files + directory tree | Agents reasoning about architecture |

@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=clear names, warn=improvements needed, fail=harms readability
 Severity: error=misleading names, warning=unclear, suggestion=style
 
+Model tier: small
+Context needs: diff-only
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No code files with nameable symbols"}` when:

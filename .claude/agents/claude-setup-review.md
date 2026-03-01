@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=complete config, warn=gaps, fail=critical missing
 Severity: error=blocks AI effectiveness, warning=reduces quality, suggestion=enhancement
 
+Model tier: small
+Context needs: project-structure
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "Not a Claude Code project"}` when:

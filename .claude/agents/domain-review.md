@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=clean model, warn=minor issues, fail=boundary violations
 Severity: error=leaky abstraction, warning=misplaced logic, suggestion=modeling improvement
 
+Model tier: frontier
+Context needs: project-structure
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No domain model to analyze"}` when:

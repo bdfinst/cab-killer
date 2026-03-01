@@ -9,6 +9,9 @@ Output JSON:
 
 Severity: error=external state mutation, warning=local mutation, suggestion=style
 
+Model tier: mid
+Context needs: diff-only
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No JS/TS files in target"}` when:

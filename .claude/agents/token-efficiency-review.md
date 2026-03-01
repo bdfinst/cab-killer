@@ -8,6 +8,9 @@ Output JSON:
 Status: pass=efficient, warn=optimization opportunities, fail=major waste
 Severity: error=critical waste, warning=significant, suggestion=minor
 
+Model tier: small
+Context needs: full-file
+
 ## Skip
 
 Return `{"status": "skip", "issues": [], "summary": "No Claude Code config or source files in target"}` when:
