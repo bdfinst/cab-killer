@@ -16,6 +16,7 @@ Agents, skills, and hooks that run inside Claude Code.
 | claude-setup-review | CLAUDE.md completeness and accuracy | small |
 | token-efficiency-review | Token usage optimization | small |
 | security-review | Injection, auth, data exposure, crypto | frontier |
+| svelte-review | Svelte reactivity pitfalls, closure state leaks, $state proxy issues | mid |
 | js-fp-review | Mutations, impure patterns | mid |
 | concurrency-review | Race conditions, async pitfalls, shared state | mid |
 | performance-review | Resource leaks, N+1, unbounded growth | small |
