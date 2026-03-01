@@ -25,17 +25,17 @@ Based on arguments, build a file list:
 - `--since <ref>`: run `git diff --name-only <ref>...HEAD`
 - Default: glob all source files in the target path (exclude node_modules, .git, dist, build, coverage)
 
-### 2. Load configuration
+### 2. Determine enabled agents
 
-Look for `config/review-config.json` in the current working directory. If it exists, read it. If not, treat all agents as enabled with default thresholds.
+List all agent files in `.claude/agents/*.md`. All agents are enabled by default.
 
-For each agent file in `.claude/agents/*.md`, check if the config disables it (`"enabled": false`). Agents not mentioned in the config are enabled by default.
+If a `review-config.json` exists in the project root, read it. It can disable specific agents (`"enabled": false`). This file is optional and project-local — it is not part of the toolkit.
 
 ### 3. Run each enabled agent
 
 For each enabled agent, read its definition from `.claude/agents/<name>.md` and review the target files following the agent's instructions.
 
-**File filtering**: If the agent's config has a `filePatterns` array (e.g., `["*.js", "*.ts"]`), only pass files matching those patterns to the agent. If the agent definition itself states a file scope (e.g., "JavaScript and TypeScript files only"), respect that. Skip the agent entirely if no target files match its patterns.
+**File scope**: Each agent definition declares its own file scope (e.g., fp-review says "JavaScript and TypeScript files only"). Respect these scope declarations — only pass matching files, and skip the agent entirely if no target files match.
 
 Produce a JSON result per agent:
 

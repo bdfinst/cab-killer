@@ -29,10 +29,6 @@ A reusable `.claude/` toolkit that adds multi-agent code review to any project. 
 - `token-efficiency-review.sh` — Warns on long files (>500 lines), long functions (>50 lines), large CLAUDE.md
 - `eval-compliance-check.sh` — Warns when agent/skill files miss required patterns
 
-## Configuration
-
-`config/review-config.json` — enable/disable agents, set thresholds.
-
 ## Install
 
 Run `./install.sh /path/to/project` to symlink agents, skills, and hooks into a target project and merge hooks into its settings.json. See README.md for details.

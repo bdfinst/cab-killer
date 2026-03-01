@@ -61,6 +61,18 @@ if [ "$FILE_TYPE" = "agent" ]; then
     warn "$AGENT_NAME: Missing scope boundaries (what does this agent NOT check?)."
   fi
 
+  # 5. Self-describing: must not depend on external config (FAIL)
+  if echo "$CONTENT" | grep -qiE 'config.*json|review-config|config/'; then
+    fail "$AGENT_NAME: References external config file. Agents must be self-describing — declare thresholds, file scope, and defaults inline."
+  fi
+
+  # 6. File scope for language-specific agents (WARN)
+  if echo "$CONTENT" | grep -qiE 'javascript\|typescript\|python\|ruby\|go\|rust\|java'; then
+    if ! echo "$CONTENT" | grep -qiE 'scope:|\.js\b|\.ts\b|\.py\b|\.rb\b|\.go\b|\.rs\b|\.java\b|files only'; then
+      warn "$AGENT_NAME: Mentions a language but doesn't declare file scope (e.g., 'Scope: *.js, *.ts files only')."
+    fi
+  fi
+
   # Always require /eval-audit after agent changes
   printf "\n"
   if [ -n "$FAILS" ]; then

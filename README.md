@@ -105,24 +105,20 @@ Hooks fire automatically on every `Write` or `Edit` via PostToolUse. They are ad
 
 ## Configuration
 
-All agents are enabled by default with no config file required. To customize, create `config/review-config.json` in your project to enable/disable agents and set thresholds:
+All agents are enabled by default — no config file required. Each agent declares its own thresholds and file scope in its definition (e.g., fp-review scopes itself to JS/TS files).
+
+To disable specific agents in your project, create a `review-config.json` in your project root:
 
 ```json
 {
   "agents": {
-    "test-review": { "enabled": true, "severityThreshold": "warning" },
-    "complexity-review": { "enabled": true, "maxComplexity": 10 },
-    "security-review": { "enabled": true },
-    "fp-review": { "enabled": true }
-  },
-  "orchestrator": {
-    "maxLoopIterations": 5,
-    "failOnError": true
+    "fp-review": { "enabled": false },
+    "domain-review": { "enabled": false }
   }
 }
 ```
 
-Agents not listed are enabled by default.
+This file is project-local and is not part of the toolkit.
 
 ## Output Format
 

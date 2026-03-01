@@ -35,6 +35,16 @@ Read each file in `.claude/agents/*.md` and check:
    - Review agents SHOULD state what other agents handle
    - WARN if missing (helps avoid duplicate findings)
 
+5. **Self-describing**: Does the agent depend on external config?
+   - Agents MUST NOT reference `config/`, `review-config.json`, or external config files
+   - Thresholds, file scope, and defaults MUST be declared inline in the agent definition
+   - FAIL if an agent references external config
+
+6. **File scope**: Does the agent declare which file types it applies to?
+   - Language-specific agents (e.g., fp-review) MUST declare their file scope
+   - Language-agnostic agents (e.g., structure-review) may omit this
+   - WARN if a language-specific agent has no file scope declaration
+
 ### Skill Checks
 
 Read each file in `.claude/skills/*/SKILL.md` and check:
@@ -71,23 +81,16 @@ Read each file in `.claude/hooks/*.sh` and check:
    - Hooks SHOULD only run on relevant file types
    - WARN if no file type filter is present
 
-### Configuration Check
-
-Read `config/review-config.json` and check:
-
-1. All agents in `.claude/agents/` have a config entry (WARN if missing)
-2. No config entries reference nonexistent agents (WARN if orphaned)
-
 ## Output Format
 
 ```
 # Eval Audit Report
 
 ## Agents
-| Agent                     | Output Format | Severity | Detection | Scope | Status |
-|---------------------------|---------------|----------|-----------|-------|--------|
-| test-review               | PASS          | PASS     | PASS      | PASS  | OK     |
-| fp-review                 | PASS          | PASS     | PASS      | PASS  | OK     |
+| Agent                     | Output Format | Severity | Detection | Scope | Self-Describing | File Scope | Status |
+|---------------------------|---------------|----------|-----------|-------|-----------------|------------|--------|
+| test-review               | PASS          | PASS     | PASS      | PASS  | PASS            | N/A        | OK     |
+| fp-review                 | PASS          | PASS     | PASS      | PASS  | PASS            | PASS       | OK     |
 | ...                       |               |          |           |       |        |
 
 ## Skills
@@ -103,11 +106,6 @@ Read `config/review-config.json` and check:
 | fp-review.sh                | PASS     | PASS  | PASS         | OK     |
 | token-efficiency-review.sh  | PASS     | PASS  | PASS         | OK     |
 | ...                         |          |       |              |        |
-
-## Configuration
-- Agents with config: [list]
-- Agents missing config: [list]
-- Orphaned config entries: [list]
 
 ## Summary
 - Agents: N OK, N WARN, N FAIL

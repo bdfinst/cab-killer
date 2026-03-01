@@ -159,37 +159,15 @@ warnings when:
 - A skill is missing numbered steps or argument parsing
 - A review-related skill has no report section
 
-## Configuration
-
-`config/review-config.json` controls which agents are enabled and their
-thresholds:
-
-```json
-{
-  "agents": {
-    "test-review": { "enabled": true, "severityThreshold": "warning" },
-    "complexity-review": { "enabled": true, "maxComplexity": 10 },
-    "fp-review": { "enabled": true }
-  },
-  "orchestrator": {
-    "maxLoopIterations": 5,
-    "failOnError": true
-  }
-}
-```
-
-Agents not listed in the config are enabled by default.
-
 ## Adding a New Agent
 
 1. Create `.claude/agents/<name>.md` with:
    - JSON output format (status, issues, summary)
    - Severity definitions (error, warning, suggestion)
-   - Detection rules
+   - Detection rules and thresholds (inline, not in a config file)
+   - File scope (which file types the agent applies to)
    - Scope boundaries (what to ignore)
 
 2. Optionally add a hook in `.claude/hooks/<name>.sh` for deterministic checks
 
-3. Add config entry in `config/review-config.json`
-
-4. Run `/eval-audit` to verify compliance
+3. Run `/eval-audit` to verify compliance
