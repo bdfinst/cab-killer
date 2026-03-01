@@ -1,8 +1,8 @@
 # cab-killer — Code Review Agent Toolkit
 
-A reusable `.claude/` toolkit that adds multi-agent code review to any project. No Node.js app — just agents, skills, and hooks that run inside Claude Code.
+A Claude Code plugin that adds multi-agent code review to any project. Agents, skills, and hooks that run inside Claude Code.
 
-## Agents (`.claude/agents/`)
+## Agents (`agents/`)
 
 | Agent | Focus | Model Tier |
 |-------|-------|------------|
@@ -20,12 +20,14 @@ A reusable `.claude/` toolkit that adds multi-agent code review to any project. 
 
 ## Skills
 
-- `/code-review` — Run all enabled agents with pre-flight gates, produce summary and correction prompts. Supports `--json`, `--force`.
-- `/review-agent <name>` — Run a single agent
-- `/review-summary` — Generate compact (<150 word) session summary for cross-session context
+- `/add-agent <description-or-url>` — Scaffold a new review agent with eval compliance
+- `/add-skill <description-or-url>` — Scaffold a new SKILL.md with eval compliance
 - `/apply-fixes <dir>` — Apply correction prompts with validation (or use [refactoring](https://github.com/elifiner/refactoring) plugin for structural fixes)
+- `/code-review` — Run all enabled agents with pre-flight gates, produce summary and correction prompts. Supports `--json`, `--force`.
 - `/eval-audit` — Audit agents/skills/hooks for eval system compliance
 - `/eval-runner` — Run eval fixtures against agents and grade results
+- `/review-agent <name>` — Run a single agent
+- `/review-summary` — Generate compact (<150 word) session summary for cross-session context
 
 ## Hooks (PostToolUse, advisory)
 
@@ -36,4 +38,6 @@ A reusable `.claude/` toolkit that adds multi-agent code review to any project. 
 
 ## Install
 
-Run `./install.sh /path/to/project` to symlink agents, skills, and hooks into a target project and merge hooks into its settings.json. See README.md for details.
+```bash
+claude plugins install https://github.com/bdfinst/cab-killer
+```
