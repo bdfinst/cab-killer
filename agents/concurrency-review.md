@@ -23,7 +23,10 @@ Context needs: full-file
 
 Return `{"status": "skip", "issues": [], "summary": "No concurrency-relevant patterns in target"}` when:
 
-- No async/await, Promise, Worker, SharedArrayBuffer, or threading patterns
+- No concurrency-relevant patterns present:
+  - JS/TS: no `async/await`, `Promise`, `Worker`, or `SharedArrayBuffer`
+  - C#: no `async/await`, `Task`, `Thread`, `Parallel`, `lock`, or `ConcurrentCollection`
+  - Java: no `Thread`, `ExecutorService`, `CompletableFuture`, `synchronized`, `volatile`, or `java.util.concurrent`
 - No shared mutable state across callbacks, event handlers, or concurrent paths
 - Pure synchronous single-threaded code with no event-driven patterns
 
@@ -43,13 +46,28 @@ Idempotency:
 - Side effects in retry-able operations (payments, emails, queue messages)
 - Missing idempotency keys on critical mutations
 
-Promise/async pitfalls:
+Async/concurrent task pitfalls:
 
-- Unhandled promise rejections (missing `.catch()` or try/catch on await)
-- Dangling promises (async calls without await)
-- Promise.all without error boundaries (one failure rejects all)
-- Sequential awaits that could be parallel (`Promise.all`)
-- async forEach (does not await iterations)
+- Unhandled rejections/exceptions:
+  - JS/TS: missing `.catch()` or `try/catch` on `await`
+  - C#: unawaited `Task` with no `.ContinueWith` error handler; `async void` methods
+  - Java: unhandled `CompletableFuture` without `.exceptionally()` or `.handle()`
+- Dangling async operations (fire-and-forget without intent):
+  - JS/TS: async calls without `await`
+  - C#: `Task` not awaited and not stored
+  - Java: `CompletableFuture` not awaited and not stored
+- Parallel task failures swallowing errors:
+  - JS/TS: `Promise.all` — one rejection cancels all without individual error handling
+  - C#: `Task.WhenAll` — exceptions from individual tasks swallowed unless explicitly checked
+  - Java: `CompletableFuture.allOf` — individual failures require explicit `.exceptionally()` per stage
+- Sequential operations that could be parallel:
+  - JS/TS: sequential `await` calls with no dependency between them (use `Promise.all`)
+  - C#: sequential `await` calls with no dependency (use `Task.WhenAll`)
+  - Java: sequential `get()` calls with no dependency (use `CompletableFuture.allOf`)
+- Iteration not awaited:
+  - JS/TS: `async` callback in `forEach` (does not await iterations; use `for...of`)
+  - C#: `async` lambda in `List.ForEach` (fire-and-forget; use `foreach` + `await`)
+  - Java: `async`-like operations inside `stream().forEach` without joining
 
 Shared state safety:
 

@@ -33,7 +33,7 @@ Resource leaks:
 - Unclosed database connections, file handles, streams, sockets
 - Missing `finally`/`using`/`defer`/`with` for resource cleanup
 - Event listeners added without corresponding removal
-- Timers (setInterval) without cleanup on teardown
+- Timers without cleanup on teardown — JS/TS: `setInterval`/`setTimeout` without `clearInterval`/`clearTimeout`; C#: `System.Timers.Timer` without `Dispose()`; Java: `ScheduledExecutorService` without `shutdown()`
 
 N+1 patterns:
 
@@ -43,7 +43,7 @@ N+1 patterns:
 
 Unbounded growth:
 
-- Caches without size limits or eviction (Map/object growing forever)
+- Caches without size limits or eviction — JS/TS: `Map`/plain object growing forever; C#: `Dictionary` or `MemoryCache` without size limits; Java: `HashMap` or `ConcurrentHashMap` without eviction policy
 - Arrays accumulating without bounds in long-lived processes
 - Event listener accumulation (adding listeners in loops or repeated calls)
 - Unbounded queue or buffer growth
@@ -53,14 +53,14 @@ Timeouts and degradation:
 - Network calls without timeout configuration
 - Missing circuit breakers on external service calls
 - No fallback for degraded dependencies
-- Blocking operations on main thread / event loop
+- Blocking operations on latency-sensitive threads — JS/TS: blocking the event loop with CPU-heavy synchronous work; C#: blocking the ASP.NET thread pool with `.Result`/`.Wait()`; Java: blocking a servlet or reactive thread with `Thread.sleep()` or `Future.get()`
 
 Algorithmic:
 
 - O(n^2) or worse in hot paths (nested loops over same collection)
 - Repeated computation that could be memoized
 - Large object cloning where partial updates suffice (deep clone in loops)
-- String concatenation in loops (use join/builder)
+- String concatenation in loops — use `join`/`StringBuilder` (Java/C#) or `Array.join` (JS/TS)
 
 ## Ignore
 

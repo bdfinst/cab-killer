@@ -7,7 +7,7 @@ model: sonnet
 
 # Accessibility Review
 
-Scope: UI component files only (.svelte, .html, .jsx, .tsx, .vue).
+Scope: UI component and template files only (.svelte, .html, .jsx, .tsx, .vue, .razor, .cshtml, .jsp).
 Skip non-component files (utilities, services, stores, configs, tests, routes/pages without markup).
 
 Output JSON:
@@ -27,7 +27,7 @@ Context needs: full-file
 Return `{"status": "skip", "issues": [], "summary": "No UI component files found"}` when:
 
 - Target contains only logic files, configs, tests, or utilities
-- No .svelte, .html, .jsx, .tsx, or .vue files with component markup present
+- No .svelte, .html, .jsx, .tsx, .vue, .razor, .cshtml, or .jsp files with component markup present
 - Files are non-component modules (stores, services, helpers, route loaders)
 
 ## Detect

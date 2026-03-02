@@ -51,8 +51,9 @@ Control flow:
 
 Async:
 
-- Callback hell (nested callbacks)
-- Unstructured promise chains
+- Callback hell (nested callbacks) — JS/TS
+- Unstructured promise chains — JS/TS: chained `.then()` without error handling; C#: deeply nested `ContinueWith()` instead of `async/await`; Java: deeply nested `CompletableFuture` chains without `exceptionally()`
+- Blocking calls inside async methods — C#: `.Result` or `.Wait()` on a `Task`; Java: `Future.get()` without timeout
 
 Cognitive load:
 
