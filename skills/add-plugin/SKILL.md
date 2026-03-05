@@ -28,6 +28,7 @@ You have been invoked with the `/add-plugin` skill.
    already in the argument.
 3. **Do not duplicate entries.** Check plugins.json before adding;
    if the plugin is already registered, report it and stop.
+4. **Be concise.** Report only the outcome — no narration of each step.
 
 ## Parse Arguments
 

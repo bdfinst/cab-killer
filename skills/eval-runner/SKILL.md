@@ -1,8 +1,10 @@
 ---
 name: eval-runner
 description: >-
-  Run eval fixtures against review agents and grade results.
-  Use to validate agent accuracy and detect regressions.
+  Run eval fixtures against review agents and grade results. Use this after
+  adding or modifying a review agent, to validate detection accuracy, or
+  when the user says "run the evals", "test the agents", "check for
+  regressions", or "how accurate is the agent".
 argument-hint: "[--agent <name>] [--fixture <name>] [--trials <n>] [--verbose]"
 user-invocable: true
 allowed-tools: >-

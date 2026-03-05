@@ -1,8 +1,11 @@
 ---
 name: eval-audit
 description: >-
-  Audit code-review agents and skills for eval system compliance.
-  Use when adding or modifying agents, skills, or hooks.
+  Audit code-review agents, skills, and hooks for structural compliance.
+  Use this when adding or modifying any agent, skill, or hook file, or for
+  a periodic health check of the toolkit. Trigger phrases: "audit the
+  agents", "check compliance", "validate the skills", "are the agents
+  correct", or any time agent/skill files change.
 argument-hint: "[file-path | --all] [--fix]"
 user-invocable: true
 allowed-tools: Read, Edit, Grep, Glob

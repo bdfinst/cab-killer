@@ -1,8 +1,11 @@
 ---
 name: review-summary
 description: >-
-  Generate a compact session summary from the most recent code review
-  results. Supports context continuity across sessions.
+  Generate a compact summary of the most recent code review results and
+  save it for future sessions. Use this at the end of a coding session after
+  /code-review has run, or when the user says "summarize the review", "save
+  the results", "generate a summary", or wants to preserve review context
+  before closing a session.
 argument-hint: "[--from <json-file>]"
 user-invocable: true
 allowed-tools: Read, Write, Glob, Bash(date *), Bash(git rev-parse *), Bash(git branch *), Bash(mkdir *)
