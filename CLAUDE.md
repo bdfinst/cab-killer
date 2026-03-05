@@ -24,6 +24,7 @@ Agents, skills, and hooks that run inside Claude Code.
 ## Skills
 
 - `/add-agent <description-or-url>` — Scaffold a new review agent with eval compliance
+- `/add-plugin <name@marketplace> [--repo <owner/repo>]` — Install a plugin and register it in plugins.json
 - `/apply-fixes <dir>` — Apply correction prompts with validation
   (or use [refactoring](https://github.com/elifiner/refactoring) plugin)
 - `/code-review` — Run all enabled agents with pre-flight gates,
