@@ -1,0 +1,23 @@
+{
+  "plugins": [
+    {
+      "repo": "bdfinst/cab-killer",
+      "marketplace": "cab-killer",
+      "name": "cab-killer",
+      "required": true
+    },
+    {
+      "marketplace": "claude-plugins-official",
+      "name": "skill-creator",
+      "required": true
+    },
+    {
+      "repo": "elifiner/refactoring",
+      "marketplace": "refactoring",
+      "name": "refactoring",
+      "required": false,
+      "flag": "with-refactoring",
+      "description": "Incremental refactoring for legacy code"
+    }
+  ]
+}

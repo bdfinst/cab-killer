@@ -1,109 +1,135 @@
 #!/usr/bin/env bash
 #
-# install.sh — Install cab-killer and optional companion plugins
+# install.sh — Install cab-killer and configured companion plugins
 #
 # Usage:
-#   ./install.sh                    Install cab-killer only
+#   ./install.sh                    Install required plugins only
 #   ./install.sh --with-refactoring Also install the refactoring plugin
+#   ./install.sh --clean            Remove existing installs before installing
 #   ./install.sh --help             Show usage
 #
 set -euo pipefail
 
-CAB_KILLER_REPO="bdfinst/cab-killer"
-CAB_KILLER_MARKETPLACE="cab-killer"
-REFACTORING_REPO="elifiner/refactoring"
-REFACTORING_MARKETPLACE="refactoring"
-WITH_REFACTORING=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGINS_CONFIG="${SCRIPT_DIR}/plugins.json"
 CLEAN=false
+declare -A ENABLED_FLAGS
 
-usage() {
-  cat <<'USAGE'
-Usage: ./install.sh [OPTIONS]
+# --- dependency checks -------------------------------------------------------
 
-Install cab-killer as a Claude Code plugin.
+if ! command -v jq &>/dev/null; then
+  echo "Error: 'jq' is required. Install it with: brew install jq"
+  exit 1
+fi
 
-Options:
-  --clean             Remove existing marketplace and plugin before installing
-  --with-refactoring  Also install the refactoring plugin for legacy code
-  --help              Show this help message
-
-Examples:
-  ./install.sh
-  ./install.sh --clean
-  ./install.sh --with-refactoring
-  curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/bdfinst/cab-killer/main/install.sh | bash -s -- --clean
-USAGE
-}
-
-for arg in "$@"; do
-  case "$arg" in
-    --clean) CLEAN=true ;;
-    --with-refactoring) WITH_REFACTORING=true ;;
-    --help|-h) usage; exit 0 ;;
-    *) echo "Unknown option: $arg"; usage; exit 1 ;;
-  esac
-done
-
-# Check for claude CLI
 if ! command -v claude &>/dev/null; then
   echo "Error: 'claude' CLI not found. Install Claude Code first:"
   echo "  https://docs.anthropic.com/en/docs/claude-code"
   exit 1
 fi
 
-if [ "$CLEAN" = true ]; then
-  echo "Removing existing cab-killer installation..."
-  claude plugin uninstall "cab-killer@${CAB_KILLER_MARKETPLACE}" 2>/dev/null || true
-  claude plugin marketplace remove "$CAB_KILLER_MARKETPLACE" 2>/dev/null || true
-  if [ "$WITH_REFACTORING" = true ]; then
-    claude plugin uninstall "refactoring@${REFACTORING_MARKETPLACE}" 2>/dev/null || true
-    claude plugin marketplace remove "$REFACTORING_MARKETPLACE" 2>/dev/null || true
-  fi
-  echo "Clean complete."
-  echo ""
-fi
-
-echo "Adding cab-killer marketplace..."
-if claude plugin marketplace add "$CAB_KILLER_REPO"; then
-  echo "Marketplace added."
-else
-  echo "Error: Failed to add cab-killer marketplace."
+if [ ! -f "$PLUGINS_CONFIG" ]; then
+  echo "Error: plugins.json not found at $PLUGINS_CONFIG"
   exit 1
 fi
 
-echo "Installing cab-killer plugin..."
-if claude plugin install "cab-killer@${CAB_KILLER_MARKETPLACE}"; then
-  echo "cab-killer installed successfully."
-else
-  echo "Error: Failed to install cab-killer."
-  exit 1
-fi
+# --- usage -------------------------------------------------------------------
 
-if [ "$WITH_REFACTORING" = true ]; then
+usage() {
+  echo "Usage: ./install.sh [OPTIONS]"
   echo ""
-  echo "Adding refactoring marketplace..."
-  if claude plugin marketplace add "$REFACTORING_REPO"; then
-    echo "Marketplace added."
-  else
-    echo "Warning: Failed to add refactoring marketplace. cab-killer is still installed."
+  echo "Install plugins defined in plugins.json."
+  echo ""
+  echo "Options:"
+  echo "  --clean   Remove existing installations before installing"
+  while IFS= read -r plugin; do
+    flag=$(echo "$plugin" | jq -r '.flag // empty')
+    desc=$(echo "$plugin" | jq -r '.description // "optional plugin"')
+    [ -n "$flag" ] && printf "  --%-20s %s\n" "$flag" "Also install: $desc"
+  done < <(jq -c '.plugins[] | select(.required == false)' "$PLUGINS_CONFIG")
+  echo "  --help    Show this help message"
+}
+
+# --- arg parsing -------------------------------------------------------------
+
+for arg in "$@"; do
+  case "$arg" in
+    --clean) CLEAN=true ;;
+    --help|-h) usage; exit 0 ;;
+    --*)
+      flag="${arg#--}"
+      if jq -e ".plugins[] | select(.flag == \"$flag\")" "$PLUGINS_CONFIG" >/dev/null 2>&1; then
+        ENABLED_FLAGS["$flag"]=true
+      else
+        echo "Unknown option: $arg"
+        usage
+        exit 1
+      fi
+      ;;
+    *) echo "Unknown option: $arg"; usage; exit 1 ;;
+  esac
+done
+
+# --- install function --------------------------------------------------------
+
+install_plugin() {
+  local repo="$1"
+  local marketplace="$2"
+  local name="$3"
+
+  if [ "$CLEAN" = true ]; then
+    echo "Removing existing $name..."
+    claude plugin uninstall "${name}@${marketplace}" 2>/dev/null || true
+    [ -n "$repo" ] && claude plugin marketplace remove "$marketplace" 2>/dev/null || true
   fi
 
-  echo "Installing refactoring plugin..."
-  if claude plugin install "refactoring@${REFACTORING_MARKETPLACE}"; then
-    echo "refactoring plugin installed successfully."
-  else
-    echo "Warning: Failed to install refactoring plugin. cab-killer is still installed."
+  if [ -n "$repo" ]; then
+    echo "Adding $name marketplace..."
+    if ! claude plugin marketplace add "$repo"; then
+      echo "Error: Failed to add marketplace for $name."
+      return 1
+    fi
   fi
-fi
+
+  echo "Installing $name..."
+  if claude plugin install "${name}@${marketplace}"; then
+    echo "$name installed successfully."
+  else
+    echo "Error: Failed to install $name."
+    return 1
+  fi
+}
+
+# --- install required plugins ------------------------------------------------
+
+while IFS= read -r plugin; do
+  repo=$(echo "$plugin" | jq -r '.repo // empty')
+  marketplace=$(echo "$plugin" | jq -r '.marketplace')
+  name=$(echo "$plugin" | jq -r '.name')
+  echo ""
+  install_plugin "$repo" "$marketplace" "$name"
+done < <(jq -c '.plugins[] | select(.required == true)' "$PLUGINS_CONFIG")
+
+# --- install optional plugins if flagged -------------------------------------
+
+while IFS= read -r plugin; do
+  flag=$(echo "$plugin" | jq -r '.flag // empty')
+  [ -z "$flag" ] && continue
+  [ -z "${ENABLED_FLAGS[$flag]+_}" ] && continue
+
+  repo=$(echo "$plugin" | jq -r '.repo // empty')
+  marketplace=$(echo "$plugin" | jq -r '.marketplace')
+  name=$(echo "$plugin" | jq -r '.name')
+  echo ""
+  install_plugin "$repo" "$marketplace" "$name"
+done < <(jq -c '.plugins[] | select(.required == false)' "$PLUGINS_CONFIG")
+
+# --- summary -----------------------------------------------------------------
 
 echo ""
 echo "Done. Available commands:"
 echo "  /code-review        Run all review agents"
 echo "  /add-agent          Scaffold a new review agent"
 echo "  /add-skill          Scaffold a new skill"
-if [ "$WITH_REFACTORING" = true ]; then
-  echo "  /refactoring        Incremental refactoring for legacy code"
-fi
 echo ""
 echo "Run /code-review in any project to get started."

@@ -24,7 +24,6 @@ Agents, skills, and hooks that run inside Claude Code.
 ## Skills
 
 - `/add-agent <description-or-url>` — Scaffold a new review agent with eval compliance
-- `/add-skill <description-or-url>` — Scaffold a new SKILL.md with eval compliance
 - `/apply-fixes <dir>` — Apply correction prompts with validation
   (or use [refactoring](https://github.com/elifiner/refactoring) plugin)
 - `/code-review` — Run all enabled agents with pre-flight gates,
@@ -34,6 +33,12 @@ Agents, skills, and hooks that run inside Claude Code.
 - `/review-agent <name>` — Run a single agent
 - `/semgrep-analyze [path] [--rules <ruleset>]` — Run Semgrep static analysis with structured output
 - `/review-summary` — Generate compact (<150 word) session summary for cross-session context
+- `/skill-creator` — Create new skills, improve existing skills, and measure skill performance
+
+## Plugin Management
+
+When enabling a new plugin (adding to `.claude/settings.json`), also add it to `plugins.json`
+so others who clone the repo can install the same set of plugins via `./install.sh`.
 
 ## Hooks (PostToolUse, advisory)
 
