@@ -15,7 +15,6 @@ Agents, skills, and hooks that run inside Claude Code.
 | doc-drift-review | Comments and docs that contradict or lag behind current code | mid |
 | domain-review | Domain boundaries, abstraction leaks | frontier |
 | js-fp-review | Mutations, impure patterns | mid |
-| logical-fallacy-review | False dichotomies, strawman, post hoc, hasty generalization in prose | mid |
 | naming-review | Naming clarity, conventions, magic values | small |
 | performance-review | Resource leaks, N+1, unbounded growth | small |
 | security-review | Injection, auth, data exposure, crypto | frontier |
