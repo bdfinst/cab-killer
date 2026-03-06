@@ -8,18 +8,21 @@ Agents, skills, and hooks that run inside Claude Code.
 | Agent | Focus | Model Tier |
 | ----- | ----- | ---------- |
 | a11y-review | WCAG 2.1 AA, semantic HTML, ARIA, keyboard nav, focus management | mid |
-| test-review | Test quality, coverage, assertions | mid |
-| structure-review | SRP, DRY, coupling, organization | mid |
-| naming-review | Naming clarity, conventions, magic values | small |
-| domain-review | Domain boundaries, abstraction leaks | frontier |
-| complexity-review | Cyclomatic complexity, nesting, function size | small |
+| ai-antipattern-review | Unnecessary abstractions, single-use factories, premature generalization, redundant indirection in AI-generated code | mid |
 | claude-setup-review | CLAUDE.md completeness and accuracy | small |
-| token-efficiency-review | Token usage optimization | small |
-| security-review | Injection, auth, data exposure, crypto | frontier |
-| svelte-review | Svelte reactivity pitfalls, closure state leaks, $state proxy issues | mid |
-| js-fp-review | Mutations, impure patterns | mid |
+| complexity-review | Cyclomatic complexity, nesting, function size | small |
 | concurrency-review | Race conditions, async pitfalls, shared state | mid |
+| doc-drift-review | Comments and docs that contradict or lag behind current code | mid |
+| domain-review | Domain boundaries, abstraction leaks | frontier |
+| js-fp-review | Mutations, impure patterns | mid |
+| logical-fallacy-review | False dichotomies, strawman, post hoc, hasty generalization in prose | mid |
+| naming-review | Naming clarity, conventions, magic values | small |
 | performance-review | Resource leaks, N+1, unbounded growth | small |
+| security-review | Injection, auth, data exposure, crypto | frontier |
+| structure-review | SRP, DRY, coupling, organization | mid |
+| svelte-review | Svelte reactivity pitfalls, closure state leaks, $state proxy issues | mid |
+| test-review | Test quality, coverage, assertions | mid |
+| token-efficiency-review | Token usage optimization | small |
 
 ## Skills
 
