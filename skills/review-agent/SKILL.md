@@ -1,8 +1,11 @@
 ---
 name: review-agent
 description: >-
-  Run a single review agent against target files. Use when the user
-  wants to run a specific agent by name rather than the full suite.
+  Run a single named review agent against target files. Use this when the
+  user names a specific agent (e.g. "run security-review", "check for test
+  issues", "run js-fp-review on this file") rather than wanting the full
+  suite. Prefer this over /code-review when only one concern is relevant or
+  speed matters.
 argument-hint: "<agent-name> [--changed | --since <ref>] [--path <dir>]"
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash(git diff *)

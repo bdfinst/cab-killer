@@ -1,8 +1,11 @@
 ---
 name: add-agent
 description: >-
-  Scaffold a new review agent from a description or URL.
-  Use when adding a new code review agent to the toolkit.
+  Scaffold a new review agent from a description or URL. Use this whenever
+  the user wants to add a new review agent, detect a new category of code
+  issue, or says things like "add an agent for X", "create a reviewer for Y",
+  "I want to check for Z in code reviews". Also use when given a URL to a
+  coding standard or best-practices guide that should become a review agent.
 argument-hint: >-
   <description-or-url> [--name <name>]
   [--tier small|mid|frontier]

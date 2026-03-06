@@ -1,9 +1,11 @@
 ---
 name: code-review
 description: >-
-  Run all enabled review agents against target files. Use after
-  implementing features, before PRs, or when the user asks for a
-  code review.
+  Run all enabled review agents against target files. Use this whenever the
+  user asks for a code review, wants feedback on their code, says "review my
+  code", "check this before I PR", "what's wrong with this", "run the
+  agents", or has just finished implementing a feature. Use proactively
+  before commits and pull requests.
 argument-hint: >-
   [--agent <name>] [--changed | --since <ref>] [--path <dir>]
   [--json] [--force]

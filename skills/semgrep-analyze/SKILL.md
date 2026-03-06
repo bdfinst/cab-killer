@@ -1,8 +1,11 @@
 ---
 name: semgrep-analyze
 description: >-
-  Run Semgrep static analysis on target files. Returns structured
-  JSON with prioritized findings.
+  Run Semgrep static analysis on target files and return structured
+  findings. Use this when the user wants static analysis, SAST scanning, or
+  security scanning — phrases like "run semgrep", "scan for
+  vulnerabilities", "static analysis on this code", or as a pre-review gate
+  when security findings are needed before AI agents run.
 argument-hint: "[path] [--rules <ruleset>]"
 user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash(semgrep *)
@@ -12,6 +15,9 @@ allowed-tools: Read, Grep, Glob, Bash(semgrep *)
 
 Role: worker. This skill runs Semgrep and reports findings — it does
 not fix code.
+
+You have been invoked with the `/semgrep-analyze` skill. Run a Semgrep
+scan and return structured findings.
 
 ## Constraints
 
