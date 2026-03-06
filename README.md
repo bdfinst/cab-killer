@@ -1,5 +1,8 @@
 # cab-killer
 
+> [!WARNING]
+> **This repository is archived.** Development has moved to [bdfinst/agentic-dev-team](https://github.com/bdfinst/agentic-dev-team). Please use that repository for the latest version and ongoing development.
+
 A multi-agent code review plugin for
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 Specialized review agents, automation skills, and deterministic
